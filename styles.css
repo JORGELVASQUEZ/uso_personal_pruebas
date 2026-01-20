@@ -1,7 +1,7 @@
 /* styles.css - archivo de prueba creado por Copilot */
 /* Reset básico */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; background: #f7f7f9; color: #222; }
+html, body { height: 100%; font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; background: #ffffff; color: #222; }
 
 /* Contenedor centrado */
 .container { width: 100%; max-width: 1100px; margin: 0 auto; padding: 24px; }
