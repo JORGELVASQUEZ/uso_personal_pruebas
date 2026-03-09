@@ -1,12 +1,7 @@
 <?php
 session_start();
 
-// Helper: generate a problem based on max operand and difficulty
 function generate_problem($max = 20, $difficulty = 'medio') {
-    // Make difficulty changes more noticeable:
-    // - 'facil': only + and - with small numbers
-    // - 'medio': +, -, * with moderate numbers
-    // - 'dificil': larger numbers, sometimes two-operator expressions including * and /
     if ($difficulty === 'facil') {
         $ops = ['+', '-'];
         $op = $ops[array_rand($ops)];
@@ -15,16 +10,13 @@ function generate_problem($max = 20, $difficulty = 'medio') {
         if ($op == '+') $answer = $a + $b; else { $a = max($a,$b); $answer = $a - $b; }
         $expr = "$a $op $b";
     } elseif ($difficulty === 'dificil') {
-        // with some probability create a two-operator expression
         if (rand(1,100) <= 50) {
-            // two operators, ensure integers for division by construction
             $ops = ['+', '-', '*', '/'];
             $op1 = $ops[array_rand($ops)];
             $op2 = $ops[array_rand($ops)];
             $a = rand(1, max(2,$max));
             $b = rand(1, max(2,intval($max/2)));
             $c = rand(1, max(2,intval($max/3)));
-            // ensure division produces integer by adjusting operands when needed
             if ($op1 == '/') {
                 $q = rand(1, max(1,intval($max/3)));
                 $a = $b * $q;
@@ -34,14 +26,11 @@ function generate_problem($max = 20, $difficulty = 'medio') {
                 $b = $c * $q;
             }
             $expr = "$a $op1 $b $op2 $c";
-            // compute answer safely using eval after validation
             $safe = preg_replace('/[^0-9+\-\*\/\s]/', '', $expr);
-            // eval the expression and return the value
             $answer_val = 0;
             try { $answer_val = @eval('return (' . $safe . ');'); } catch (Exception $e) { $answer_val = 0; }
             $answer = intval($answer_val);
         } else {
-            // single op but larger numbers
             $ops = ['*','/','+','-'];
             $op = $ops[array_rand($ops)];
             if ($op == '*') {
@@ -61,7 +50,6 @@ function generate_problem($max = 20, $difficulty = 'medio') {
             $expr = "$a $op $b";
         }
     } else {
-        // medio
         $ops = ['+','-','*'];
         $op = $ops[array_rand($ops)];
         if ($op == '*') {
@@ -78,7 +66,6 @@ function generate_problem($max = 20, $difficulty = 'medio') {
     return ['expr' => $expr, 'answer' => intval($answer)];
 }
 
-// Initialize defaults and handle actions
 if (!isset($_SESSION['rounds'])) {
     $_SESSION['rounds'] = 0;
     $_SESSION['correct'] = 0;
@@ -88,7 +75,6 @@ if (!isset($_SESSION['rounds'])) {
 $message = '';
 $error = '';
 
-// Save score to a simple JSON file (append entry)
 function save_score_record($data) {
     $file = __DIR__ . '/scores.json';
     $existing = [];
@@ -100,7 +86,6 @@ function save_score_record($data) {
     @file_put_contents($file, json_encode($existing, JSON_PRETTY_PRINT));
 }
 
-// Load recent scores (most recent last)
 function load_recent_scores($limit = 5) {
     $file = __DIR__ . '/scores.json';
     if (!file_exists($file)) return [];
@@ -109,12 +94,10 @@ function load_recent_scores($limit = 5) {
     return array_slice(array_reverse($all), 0, $limit);
 }
 
-// Handle start/new game form (includes difficulty)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'start') {
     $difficulty = $_POST['difficulty'] ?? 'medio';
     $difficulty = in_array($difficulty, ['facil','medio','dificil']) ? $difficulty : 'medio';
 
-    // map difficulty to defaults
     $map = [
         'facil' => ['max' => 10, 'time' => 15, 'attempts' => 3],
         'medio' => ['max' => 20, 'time' => 10, 'attempts' => 2],
@@ -122,7 +105,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     ];
     $defaults = $map[$difficulty];
 
-    // Use user-provided values if present (non-empty), otherwise defaults by difficulty
     $time_raw = $_POST['time_limit'] ?? '';
     if (trim((string)$time_raw) === '') {
         $time_limit = $defaults['time'];
@@ -152,9 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $_SESSION['start_time'] = time();
 }
 
-// Handle answer submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'answer') {
-    // ensure we have a problem
     if (!isset($_SESSION['expr'])) {
         $error = 'No hay pregunta activa. Inicia una nueva ronda.';
     } else {
@@ -166,14 +146,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $_SESSION['rounds']++;
             $_SESSION['timed_out']++;
             $message = 'Tiempo agotado. La respuesta correcta era: ' . $_SESSION['answer'];
-            // mark as no active problem (user can click "Siguiente")
             unset($_SESSION['expr'], $_SESSION['answer'], $_SESSION['start_time']);
         } else {
             $user = trim($_POST['user_answer'] ?? '');
             if ($user === '') {
                 $error = 'Introduce una respuesta.';
             } else {
-                // numeric compare
                 if (is_numeric($user)) {
                     $val = $user + 0;
                     if ($val == $_SESSION['answer']) {
@@ -199,7 +177,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// Handle next round
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'next') {
     $max = $_SESSION['max_operand'] ?? 20;
     $p = generate_problem($max, $_SESSION['difficulty'] ?? 'medio');
@@ -209,10 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $_SESSION['start_time'] = time();
 }
 
-// Handle quit
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'quit') {
-    // clear session game variables
-    // Before clearing, save final result to scores.json
     $record = [
         'timestamp' => time(),
         'rounds' => intval($_SESSION['rounds'] ?? 0),
@@ -226,12 +200,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $message = 'Juego finalizado. Resultado guardado.';
 }
 
-// Prepare view variables
 $expr = $_SESSION['expr'] ?? null;
 $attempts_left = $_SESSION['attempts_left'] ?? ($_SESSION['attempts_limit'] ?? 0);
 $time_limit = $_SESSION['time_limit'] ?? 10;
 $start_time = $_SESSION['start_time'] ?? null;
-// load recent scores for display
 $recent_scores = load_recent_scores(5);
 
 ?>
@@ -314,7 +286,6 @@ $recent_scores = load_recent_scores(5);
 </div>
 
 <script>
-// Countdown and auto-submit when time runs out (uses server start_time)
 <?php if ($start_time): ?>
 let serverStart = <?php echo intval($start_time); ?>;
 let timeLimit = <?php echo intval($time_limit); ?>;
@@ -327,10 +298,8 @@ function updateTimer(){
     if (!el) return;
     if (left <= 0){
         el.textContent = '0';
-        // auto-submit a blank answer to trigger server timeout handling
         let form = document.getElementById('answerForm');
         if (form){
-            // create hidden field to indicate timeout submission
             let inp = document.createElement('input');
             inp.type = 'hidden'; inp.name = 'user_answer'; inp.value = '';
             form.appendChild(inp);
@@ -344,7 +313,6 @@ function updateTimer(){
 updateTimer();
 <?php endif; ?>
 
-// Sound helpers (WebAudio) and animations
 function createAudioContext(){
     try{ return new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ return null; }
 }
@@ -360,18 +328,17 @@ function playTone(freq, duration=0.15, type='sine', gain=0.07){
     setTimeout(()=>{ o.stop(); }, duration*1000);
 }
 function playCorrect(){
-    // celebratory melody sequence
     const seq = [440,660,880,1100];
     let t = 0;
     seq.forEach((f,i)=>{
         setTimeout(()=>playTone(f, 0.12, 'sine', 0.09), t*100);
         t += 1.2;
     });
-    // layered twinkle
+
     setTimeout(()=>{ playTone(1320,0.08,'triangle',0.06); playTone(1760,0.08,'sine',0.05); }, 600);
-    // larger confetti
+
     createConfetti(); createConfetti();
-    // highlight server message visually
+
     const sm = document.getElementById('serverMessage');
     if(sm){ sm.classList.add('show'); sm.classList.add('correct'); setTimeout(()=>sm.classList.remove('show'),900); }
 }
@@ -380,7 +347,6 @@ function playTimeout(){ playTone(200,0.45,'sine',0.14); }
 
 function playNext(){ playTone(520,0.12,'sine',0.06); playTone(720,0.08,'square',0.04); }
 
-// Visual animations
 function animateCorrect(){
     const c = document.querySelector('.container');
     if(!c) return;
@@ -394,7 +360,6 @@ function animateWrong(){
     setTimeout(()=>q.classList.remove('shake'),700);
 }
 
-// Simple confetti
 function createConfetti(){
     const colors = ['#ff5e5e','#ffd166','#6ee7b7','#60a5fa','#b794f4'];
     const count = 30;
@@ -412,7 +377,6 @@ function createConfetti(){
     }
 }
 
-// React to server-side message/error
 let serverMessage = <?php echo json_encode($message); ?>;
 let serverError = <?php echo json_encode($error); ?>;
 if(serverMessage){
@@ -423,11 +387,8 @@ if(serverMessage){
 }
 if(serverError){ const errEl = document.getElementById('serverError'); if(errEl) { errEl.classList.add('wrong'); } animateWrong(); playWrong(); }
 
-// Play a sound when clicking Siguiente
 const nextBtn = document.querySelector('form input[value="next"] , form button');
-// attach to the specific Next button (the form with hidden action=next)
 const nextFormBtn = document.querySelector('form[action] button');
-// simpler: attach to any button with text Content 'Siguiente'
 Array.from(document.querySelectorAll('button')).forEach(b=>{
     if(b.textContent.trim().toLowerCase() === 'siguiente') b.addEventListener('click', ()=>{ playNext(); });
 });

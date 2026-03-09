@@ -1,0 +1,23 @@
+[
+    {
+        "timestamp": 1772638333,
+        "rounds": 0,
+        "correct": 0,
+        "timed_out": 0,
+        "difficulty": "facil"
+    },
+    {
+        "timestamp": 1772638337,
+        "rounds": 0,
+        "correct": 0,
+        "timed_out": 0,
+        "difficulty": "medio"
+    },
+    {
+        "timestamp": 1772638341,
+        "rounds": 0,
+        "correct": 0,
+        "timed_out": 0,
+        "difficulty": "dificil"
+    }
+]
