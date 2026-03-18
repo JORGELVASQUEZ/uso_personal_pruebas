@@ -137,7 +137,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             const registerForm = document.getElementById('register-seller-form');
             
-            registerForm.addEventListener('submit', function(e) {
+            registerForm.addEventListener('submit', async function(e) {
                 e.preventDefault();
                 
                 const storeName = document.getElementById('store-name').value;
@@ -174,7 +174,7 @@
                 };
                 
                 // Registrar usuario vendedor
-                if (register(userData)) {
+                if (await register(userData)) {
                     // Redirigir al inicio
                     setTimeout(() => {
                         window.location.href = 'index.php';

@@ -120,7 +120,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             const registerForm = document.getElementById('register-form');
             
-            registerForm.addEventListener('submit', function(e) {
+            registerForm.addEventListener('submit', async function(e) {
                 e.preventDefault();
                 
                 const name = document.getElementById('name').value;
@@ -150,7 +150,7 @@
                 };
                 
                 // Registrar usuario
-                if (register(userData)) {
+                if (await register(userData)) {
                     // Redirigir al inicio
                     setTimeout(() => {
                         window.location.href = 'index.php';

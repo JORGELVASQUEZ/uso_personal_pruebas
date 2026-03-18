@@ -95,14 +95,13 @@
         document.addEventListener('DOMContentLoaded', function() {
             const loginForm = document.getElementById('login-form');
             
-            loginForm.addEventListener('submit', function(e) {
+            loginForm.addEventListener('submit', async function(e) {
                 e.preventDefault();
                 
                 const email = document.getElementById('email').value;
                 const password = document.getElementById('password').value;
                 
-                // Simulación de login
-                if (login(email, password)) {
+                if (await login(email, password)) {
                     // Redirigir después de login exitoso
                     const urlParams = new URLSearchParams(window.location.search);
                     const redirect = urlParams.get('redirect');

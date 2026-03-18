@@ -21,34 +21,74 @@ const offers = [
 // Carrito de compras
 let cart = [];
 
-// Usuario actual (simulación)
+// Usuario actual
 let currentUser = null;
 
-// Función para guardar en localStorage
-function saveToLocalStorage(key, data) {
-    localStorage.setItem(key, JSON.stringify(data));
+function appendFormValue(params, key, value) {
+    if (Array.isArray(value)) {
+        value.forEach((item, index) => {
+            appendFormValue(params, `${key}[${index}]`, item);
+        });
+        return;
+    }
+
+    if (value !== null && typeof value === 'object') {
+        Object.entries(value).forEach(([subKey, subValue]) => {
+            appendFormValue(params, `${key}[${subKey}]`, subValue);
+        });
+        return;
+    }
+
+    params.append(key, value ?? '');
 }
 
-// Función para cargar desde localStorage
-function loadFromLocalStorage(key) {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : null;
+async function apiRequest(action, body = null, method = 'POST') {
+    const options = { method };
+
+    if (body !== null) {
+        const params = new URLSearchParams();
+        Object.entries(body).forEach(([key, value]) => {
+            appendFormValue(params, key, value);
+        });
+
+        options.headers = {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+        };
+        options.body = params.toString();
+    }
+
+    const response = await fetch(`api.php?action=${encodeURIComponent(action)}`, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+        return {
+            success: false,
+            message: data.message || 'Error en la petición'
+        };
+    }
+
+    return data;
+}
+
+async function persistCart() {
+    const response = await apiRequest('save_cart', { cart });
+    if (!response.success) {
+        showNotification('No se pudo sincronizar el carrito', 'warning');
+    }
 }
 
 // Inicializar datos
-function initData() {
-    // Cargar carrito desde localStorage
-    const savedCart = loadFromLocalStorage('cart');
-    if (savedCart) {
-        cart = savedCart;
+async function initData() {
+    const response = await apiRequest('session_state', null, 'GET');
+
+    if (!response.success) {
+        showNotification('No se pudo cargar la sesión', 'warning');
+        return;
     }
-    
-    // Cargar usuario desde localStorage
-    const savedUser = loadFromLocalStorage('currentUser');
-    if (savedUser) {
-        currentUser = savedUser;
-        updateUserUI();
-    }
+
+    cart = Array.isArray(response.cart) ? response.cart : [];
+    currentUser = response.user || null;
+    updateUserUI();
 }
 
 // Generar estrellas de calificación
@@ -148,8 +188,8 @@ function updateCart() {
     cartCountElement.textContent = itemCount;
     cartTotalElement.textContent = `$${total.toFixed(2)}`;
     
-    // Guardar carrito en localStorage
-    saveToLocalStorage('cart', cart);
+    // Sincronizar carrito con base de datos
+    persistCart();
     
     // Agregar eventos a los botones del carrito
     document.querySelectorAll('.decrease').forEach(btn => {
@@ -311,65 +351,62 @@ function updateUserUI() {
 }
 
 // Función de login
-function login(email, password) {
-    // Simulación de login
-    const users = loadFromLocalStorage('users') || [];
-    const user = users.find(u => u.email === email && u.password === password);
-    
-    if (user) {
-        currentUser = user;
-        saveToLocalStorage('currentUser', currentUser);
+async function login(email, password) {
+    const response = await apiRequest('login', { email, password });
+
+    if (response.success) {
+        currentUser = response.user;
+        cart = Array.isArray(response.cart) ? response.cart : cart;
         updateUserUI();
-        showNotification(`¡Bienvenido ${user.name}!`);
+        updateCart();
+        showNotification(`¡Bienvenido ${currentUser.name}!`);
         return true;
-    } else {
-        showNotification('Email o contraseña incorrectos', 'error');
-        return false;
     }
+
+    showNotification(response.message || 'Email o contraseña incorrectos', 'error');
+    return false;
 }
 
 // Función de registro
-function register(userData) {
-    const users = loadFromLocalStorage('users') || [];
-    
-    // Verificar si el usuario ya existe
-    const existingUser = users.find(u => u.email === userData.email);
-    if (existingUser) {
-        showNotification('Este email ya está registrado', 'error');
+async function register(userData) {
+    const response = await apiRequest('register', userData);
+
+    if (!response.success) {
+        showNotification(response.message || 'No se pudo completar el registro', 'error');
         return false;
     }
-    
-    // Agregar nuevo usuario
-    users.push(userData);
-    saveToLocalStorage('users', users);
-    
-    // Iniciar sesión automáticamente
-    currentUser = userData;
-    saveToLocalStorage('currentUser', currentUser);
-    
-    showNotification('¡Registro exitoso! Bienvenido a RapiMarket');
+
+    currentUser = response.user;
+    cart = Array.isArray(response.cart) ? response.cart : cart;
+    showNotification(response.message || '¡Registro exitoso! Bienvenido a RapiMarket');
     updateUserUI();
+    updateCart();
     return true;
 }
 
 // Función de logout
-function logout() {
+async function logout() {
+    await apiRequest('logout', {});
     currentUser = null;
-    localStorage.removeItem('currentUser');
+
+    const response = await apiRequest('session_state', null, 'GET');
+    cart = response.success && Array.isArray(response.cart) ? response.cart : [];
+
     updateUserUI();
+    updateCart();
     showNotification('Sesión cerrada correctamente');
 }
 
 // Inicializar la aplicación
-document.addEventListener('DOMContentLoaded', () => {
-    initData();
+document.addEventListener('DOMContentLoaded', async () => {
+    await initData();
     initCart();
     updateUserUI();
     
     // Agregar evento al botón de checkout si existe
     const checkoutBtn = document.querySelector('.checkout-btn');
     if (checkoutBtn) {
-        checkoutBtn.addEventListener('click', () => {
+        checkoutBtn.addEventListener('click', async () => {
             if (cart.length === 0) {
                 showNotification('Tu carrito está vacío', 'warning');
                 return;
@@ -380,7 +417,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.location.href = 'login.php?redirect=checkout';
                 return;
             }
-            
+
+            const checkoutResponse = await apiRequest('checkout', {});
+            if (!checkoutResponse.success) {
+                showNotification(checkoutResponse.message || 'No se pudo procesar la compra', 'error');
+                return;
+            }
+
             showNotification('¡Compra realizada con éxito! Gracias por tu pedido.');
             
             // Vaciar carrito después de comprar
