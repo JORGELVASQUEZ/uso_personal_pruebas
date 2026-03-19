@@ -246,8 +246,25 @@ $recent_scores = load_recent_scores(5);
                     <option value="dificil" <?php echo ($_SESSION['difficulty'] ?? 'medio') === 'dificil' ? 'selected' : ''; ?>>Difícil</option>
                 </select>
             </label>
-            <label>Tiempo por pregunta (segundos, vacío = por defecto según dificultad): <input name="time_limit" type="number" value="" min="1" placeholder="por defecto"></label>
-            <label>Intentos por pregunta (vacío = por defecto según dificultad): <input name="attempts" type="number" value="" min="1" placeholder="por defecto"></label>
+            
+            <div class="input-group">
+                <label>Tiempo por pregunta (segundos):</label>
+                <div class="input-control">
+                    <button type="button" class="btn-control" id="timeDecrement">−</button>
+                    <input name="time_limit" type="number" value="" min="1" placeholder="por defecto" id="timeInput" class="input-small">
+                    <button type="button" class="btn-control" id="timeIncrement">+</button>
+                </div>
+            </div>
+            
+            <div class="input-group">
+                <label>Intentos por pregunta:</label>
+                <div class="input-control">
+                    <button type="button" class="btn-control" id="attemptsDecrement">−</button>
+                    <input name="attempts" type="number" value="" min="1" placeholder="por defecto" id="attemptsInput" class="input-small">
+                    <button type="button" class="btn-control" id="attemptsIncrement">+</button>
+                </div>
+            </div>
+            
             <div class="buttons">
                 <button type="submit">Iniciar</button>
                 <button type="submit" name="action" value="quit">Salir</button>
@@ -392,6 +409,162 @@ const nextFormBtn = document.querySelector('form[action] button');
 Array.from(document.querySelectorAll('button')).forEach(b=>{
     if(b.textContent.trim().toLowerCase() === 'siguiente') b.addEventListener('click', ()=>{ playNext(); });
 });
+
+/* ============================================
+   ANIMACIONES PARA CAMPOS DE TIEMPO E INTENTOS
+   ============================================ */
+
+// Animar campos de entrada al enfocarse
+const timeInput = document.querySelector('input[name="time_limit"]');
+const attemptsInput = document.querySelector('input[name="attempts"]');
+const selects = document.querySelectorAll('select');
+
+// Botones de control para incremento/decremento
+const timeDecrement = document.getElementById('timeDecrement');
+const timeIncrement = document.getElementById('timeIncrement');
+const attemptsDecrement = document.getElementById('attemptsDecrement');
+const attemptsIncrement = document.getElementById('attemptsIncrement');
+const timeInputSmall = document.getElementById('timeInput');
+const attemptsInputSmall = document.getElementById('attemptsInput');
+
+function setupControlButtons(decrementBtn, incrementBtn, inputEl) {
+  if (!decrementBtn || !incrementBtn || !inputEl) return;
+  
+  function updateValue(delta) {
+    let val = parseInt(inputEl.value) || 1;
+    val = Math.max(1, val + delta);
+    inputEl.value = val;
+    
+    // Animar el input
+    inputEl.style.transform = 'scale(1.08)';
+    inputEl.style.borderColor = 'var(--primary)';
+    
+    // Reproducir sonido
+    playTone(delta > 0 ? 600 : 500, 0.1, 'sine', 0.05);
+    
+    setTimeout(() => {
+      inputEl.style.transform = 'scale(1)';
+      inputEl.style.borderColor = 'var(--border)';
+    }, 150);
+    
+    // Disparar evento change
+    inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  
+  decrementBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    updateValue(-1);
+  });
+  
+  incrementBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    updateValue(1);
+  });
+  
+  // Asegurar que sea un número válido al cambiar
+  inputEl.addEventListener('blur', function() {
+    if (this.value && parseInt(this.value) < 1) {
+      this.value = 1;
+    }
+  });
+}
+
+function addInputAnimations(input) {
+  if (!input) return;
+  
+  // Evento de enfoque
+  input.addEventListener('focus', function() {
+    this.style.transform = 'scale(1.02)';
+    this.style.boxShadow = '0 0 0 3px rgba(5, 150, 105, 0.15), inset 0 0 8px rgba(5, 150, 105, 0.08)';
+    playTone(880, 0.1, 'sine', 0.04);
+  });
+  
+  // Evento de desenfoque
+  input.addEventListener('blur', function() {
+    this.style.transform = 'scale(1)';
+  });
+  
+  // Evento de cambio de valor con retroalimentación audible
+  input.addEventListener('change', function() {
+    if (this.value && this.value > 0) {
+      playTone(550, 0.08, 'sine', 0.05);
+      playTone(750, 0.08, 'sine', 0.04);
+      
+      // Animación de confirmación
+      this.classList.add('input-validated');
+      this.style.background = 'rgba(5, 150, 105, 0.08)';
+      setTimeout(() => {
+        this.classList.remove('input-validated');
+        this.style.background = 'var(--bg-white)';
+      }, 400);
+    }
+  });
+  
+  // Efecto de entrada de valor (contador animado)
+  input.addEventListener('input', function() {
+    if (this.value && this.value > 0) {
+      this.style.borderColor = 'var(--primary)';
+      this.style.boxShadow = '0 0 0 2px rgba(5, 150, 105, 0.1), 0 2px 8px rgba(5, 150, 105, 0.1)';
+      
+      // Efecto de pulso suave
+      this.style.animation = 'none';
+      setTimeout(() => {
+        this.style.animation = 'inputPulse 0.6s ease';
+      }, 10);
+    } else {
+      this.style.borderColor = 'var(--border)';
+      this.style.boxShadow = 'none';
+      this.style.animation = 'none';
+    }
+  });
+}
+
+// Animar selectores
+function addSelectAnimations(select) {
+  if (!select) return;
+  
+  select.addEventListener('focus', function() {
+    this.style.transform = 'scale(1.02)';
+    playTone(820, 0.1, 'sine', 0.04);
+  });
+  
+  select.addEventListener('blur', function() {
+    this.style.transform = 'scale(1)';
+  });
+  
+  select.addEventListener('change', function() {
+    playTone(650, 0.12, 'sine', 0.05);
+    playTone(880, 0.12, 'sine', 0.04);
+    
+    // Efecto visual de cambio
+    this.style.background = 'rgba(5, 150, 105, 0.1)';
+    setTimeout(() => {
+      this.style.background = 'var(--bg-white)';
+    }, 300);
+  });
+}
+
+// Aplicar animaciones
+if (timeInput) addInputAnimations(timeInput);
+if (attemptsInput) addInputAnimations(attemptsInput);
+selects.forEach(select => addSelectAnimations(select));
+
+// Configurar botones de control
+setupControlButtons(timeDecrement, timeIncrement, timeInputSmall);
+setupControlButtons(attemptsDecrement, attemptsIncrement, attemptsInputSmall);
+
+// Efecto hover en inputs grandes (answer form)
+const userAnswer = document.getElementById('user_answer');
+if (userAnswer) {
+  userAnswer.addEventListener('mouseenter', function() {
+    this.style.borderColor = 'rgba(5, 150, 105, 0.4)';
+  });
+  userAnswer.addEventListener('mouseleave', function() {
+    if (document.activeElement !== this) {
+      this.style.borderColor = 'var(--border)';
+    }
+  });
+}
 </script>
 </body>
 </html>
