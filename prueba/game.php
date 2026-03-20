@@ -7,8 +7,12 @@ function generate_problem($max = 20, $difficulty = 'medio') {
         $op = $ops[array_rand($ops)];
         $a = rand(0, max(5, intval($max/2)));
         $b = rand(0, max(5, intval($max/2)));
-        if ($op == '+') $answer = $a + $b; else { $a = max($a,$b); $answer = $a - $b; }
         $expr = "$a $op $b";
+        // Evaluar la expresión tal cual para permitir resultados negativos (p.ej. 9 - 13 = -4)
+        $safe = preg_replace('/[^0-9+\-\*\/\s]/', '', $expr);
+        $answer_val = 0;
+        try { $answer_val = @eval('return (' . $safe . ');'); } catch (Exception $e) { $answer_val = 0; }
+        $answer = intval($answer_val);
     } elseif ($difficulty === 'dificil') {
         if (rand(1,100) <= 50) {
             $ops = ['+', '-', '*', '/'];
@@ -30,7 +34,7 @@ function generate_problem($max = 20, $difficulty = 'medio') {
             $answer_val = 0;
             try { $answer_val = @eval('return (' . $safe . ');'); } catch (Exception $e) { $answer_val = 0; }
             $answer = intval($answer_val);
-        } else {
+            } else {
             $ops = ['*','/','+','-'];
             $op = $ops[array_rand($ops)];
             if ($op == '*') {
@@ -45,7 +49,11 @@ function generate_problem($max = 20, $difficulty = 'medio') {
             } else {
                 $a = rand(0, $max);
                 $b = rand(0, $max);
-                $answer = $op == '+' ? $a + $b : max($a,$b) - min($a,$b);
+                $expr = "$a $op $b";
+                $safe = preg_replace('/[^0-9+\-\*\/\s]/', '', $expr);
+                $answer_val = 0;
+                try { $answer_val = @eval('return (' . $safe . ');'); } catch (Exception $e) { $answer_val = 0; }
+                $answer = intval($answer_val);
             }
             $expr = "$a $op $b";
         }
@@ -59,9 +67,13 @@ function generate_problem($max = 20, $difficulty = 'medio') {
         } else {
             $a = rand(0, $max);
             $b = rand(0, $max);
-            $answer = $op == '+' ? $a + $b : max($a,$b) - min($a,$b);
+            $expr = "$a $op $b";
+            $safe = preg_replace('/[^0-9+\-\*\/\s]/', '', $expr);
+            $answer_val = 0;
+            try { $answer_val = @eval('return (' . $safe . ');'); } catch (Exception $e) { $answer_val = 0; }
+            $answer = intval($answer_val);
         }
-        $expr = "$a $op $b";
+        if (!isset($expr)) $expr = "$a $op $b";
     }
     return ['expr' => $expr, 'answer' => intval($answer)];
 }
@@ -70,6 +82,7 @@ if (!isset($_SESSION['rounds'])) {
     $_SESSION['rounds'] = 0;
     $_SESSION['correct'] = 0;
     $_SESSION['timed_out'] = 0;
+    $_SESSION['incorrect'] = 0;
 }
 
 $message = '';
@@ -126,6 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $_SESSION['rounds'] = 0;
     $_SESSION['correct'] = 0;
     $_SESSION['timed_out'] = 0;
+    $_SESSION['incorrect'] = 0;
 
     $p = generate_problem($_SESSION['max_operand'], $_SESSION['difficulty']);
     $_SESSION['expr'] = $p['expr'];
@@ -146,25 +160,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $_SESSION['rounds']++;
             $_SESSION['timed_out']++;
             $message = 'Tiempo agotado. La respuesta correcta era: ' . $_SESSION['answer'];
-            unset($_SESSION['expr'], $_SESSION['answer'], $_SESSION['start_time']);
+
+            // Generar nueva pregunta automáticamente (el juego continúa hasta que el usuario pulse Salir)
+            // Contar los timeouts también como incorrectas
+            $_SESSION['incorrect'] = ($_SESSION['incorrect'] ?? 0) + 1;
+
+            $max = $_SESSION['max_operand'] ?? 20;
+            $p = generate_problem($max, $_SESSION['difficulty'] ?? 'medio');
+            $_SESSION['expr'] = $p['expr'];
+            $_SESSION['answer'] = $p['answer'];
+            $_SESSION['attempts_left'] = $_SESSION['attempts_limit'] ?? 2;
+            $_SESSION['start_time'] = time();
         } else {
-            $user = trim($_POST['user_answer'] ?? '');
-            if ($user === '') {
+            $userRaw = trim($_POST['user_answer'] ?? '');
+            if ($userRaw === '') {
                 $error = 'Introduce una respuesta.';
             } else {
-                if (is_numeric($user)) {
-                    $val = $user + 0;
+                // Normalizar guiones/minus unicode y espacios comunes del input
+                $userNorm = str_replace(array('−', '—', '–'), '-', $userRaw);
+                // Eliminar espacios entre signo y número (ej: '- 5' -> '-5')
+                $userNorm = preg_replace('/\s+/', '', $userNorm);
+                // Aceptar coma decimal como punto
+                $userNorm = str_replace(',', '.', $userNorm);
+
+                if (is_numeric($userNorm)) {
+                    // Forzar conversión numérica segura
+                    $val = $userNorm + 0;
                     if ($val == $_SESSION['answer']) {
                         $_SESSION['rounds']++;
                         $_SESSION['correct']++;
                         $message = '¡Correcto!';
-                        unset($_SESSION['expr'], $_SESSION['answer'], $_SESSION['start_time']);
+
+                        // Generar siguiente pregunta automáticamente
+                        $max = $_SESSION['max_operand'] ?? 20;
+                        $p = generate_problem($max, $_SESSION['difficulty'] ?? 'medio');
+                        $_SESSION['expr'] = $p['expr'];
+                        $_SESSION['answer'] = $p['answer'];
+                        $_SESSION['attempts_left'] = $_SESSION['attempts_limit'] ?? 2;
+                        $_SESSION['start_time'] = time();
                     } else {
                         $_SESSION['attempts_left'] = max(0, ($_SESSION['attempts_left'] ?? 1) - 1);
                         if (($_SESSION['attempts_left'] ?? 0) <= 0) {
                             $_SESSION['rounds']++;
+                            $_SESSION['incorrect'] = ($_SESSION['incorrect'] ?? 0) + 1;
                             $message = 'Incorrecto. Agotaste los intentos. La respuesta era: ' . $_SESSION['answer'];
-                            unset($_SESSION['expr'], $_SESSION['answer'], $_SESSION['start_time']);
+
+                            // Generar nueva pregunta automáticamente
+                            $max = $_SESSION['max_operand'] ?? 20;
+                            $p = generate_problem($max, $_SESSION['difficulty'] ?? 'medio');
+                            $_SESSION['expr'] = $p['expr'];
+                            $_SESSION['answer'] = $p['answer'];
+                            $_SESSION['attempts_left'] = $_SESSION['attempts_limit'] ?? 2;
+                            $_SESSION['start_time'] = time();
                         } else {
                             $error = 'Incorrecto. Te quedan ' . $_SESSION['attempts_left'] . ' intento(s).';
                         }
@@ -192,12 +239,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         'rounds' => intval($_SESSION['rounds'] ?? 0),
         'correct' => intval($_SESSION['correct'] ?? 0),
         'timed_out' => intval($_SESSION['timed_out'] ?? 0),
+        'incorrect' => intval($_SESSION['incorrect'] ?? 0),
         'difficulty' => $_SESSION['difficulty'] ?? 'medio',
     ];
     save_score_record($record);
 
     unset($_SESSION['expr'], $_SESSION['answer'], $_SESSION['start_time'], $_SESSION['attempts_left'], $_SESSION['time_limit'], $_SESSION['attempts_limit']);
-    $message = 'Juego finalizado. Resultado guardado.';
+    $r = intval($_SESSION['rounds'] ?? 0);
+    $c = intval($_SESSION['correct'] ?? 0);
+    $i = intval($_SESSION['incorrect'] ?? 0);
+    $message = 'Juego finalizado. Rondas: ' . $r . ' — Correctas: ' . $c . ' — Incorrectas: ' . $i . '. Resultado guardado.';
 }
 
 $expr = $_SESSION['expr'] ?? null;
@@ -223,6 +274,7 @@ $recent_scores = load_recent_scores(5);
         <span>Rondas: <?php echo intval($_SESSION['rounds'] ?? 0); ?></span>
         <span>Correctas: <?php echo intval($_SESSION['correct'] ?? 0); ?></span>
         <span>Tiempo agotado: <?php echo intval($_SESSION['timed_out'] ?? 0); ?></span>
+        <span>Incorrectas: <?php echo intval($_SESSION['incorrect'] ?? 0); ?></span>
     </div>
 
     <?php if (!empty($recent_scores)): ?>
@@ -230,7 +282,7 @@ $recent_scores = load_recent_scores(5);
             <h3>Últimos resultados</h3>
             <ul>
                 <?php foreach($recent_scores as $r): ?>
-                    <li><?php echo date('Y-m-d H:i', $r['timestamp']); ?> — dificultad: <?php echo htmlspecialchars($r['difficulty']); ?> — correctas: <?php echo intval($r['correct']); ?> / <?php echo intval($r['rounds']); ?></li>
+                    <li><?php echo date('Y-m-d H:i', $r['timestamp']); ?> — dificultad: <?php echo htmlspecialchars($r['difficulty']); ?> — correctas: <?php echo intval($r['correct']); ?> / <?php echo intval($r['rounds']); ?> — incorrectas: <?php echo intval($r['incorrect'] ?? 0); ?></li>
                 <?php endforeach; ?>
             </ul>
         </div>
@@ -290,10 +342,6 @@ $recent_scores = load_recent_scores(5);
             </form>
 
         </div>
-        <form method="post">
-            <input type="hidden" name="action" value="next">
-            <button type="submit">Siguiente</button>
-        </form>
 
     <?php endif; ?>
 
@@ -403,6 +451,40 @@ if(serverMessage){
     else if(serverMessage.indexOf('Tiempo agotado') !== -1){ playTimeout(); animateWrong(); if(smEl) smEl.classList.add('wrong'); }
 }
 if(serverError){ const errEl = document.getElementById('serverError'); if(errEl) { errEl.classList.add('wrong'); } animateWrong(); playWrong(); }
+
+// Mostrar un overlay breve con el mensaje del servidor para dar pausa entre preguntas
+if (serverMessage) {
+    try {
+        const overlay = document.createElement('div');
+        overlay.id = 'pauseOverlay';
+        overlay.style.position = 'fixed';
+        overlay.style.left = '0';
+        overlay.style.top = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.display = 'flex';
+        overlay.style.alignItems = 'center';
+        overlay.style.justifyContent = 'center';
+        overlay.style.background = 'rgba(0,0,0,0.45)';
+        overlay.style.zIndex = '9999';
+        overlay.style.color = '#fff';
+        overlay.style.fontSize = '1.4rem';
+        overlay.style.textAlign = 'center';
+        overlay.style.padding = '1rem';
+        overlay.style.boxSizing = 'border-box';
+        overlay.innerText = serverMessage;
+        document.body.appendChild(overlay);
+    // Duración de la pausa (ms)
+    const PAUSE_MS = 1200;
+        setTimeout(() => {
+            overlay.remove();
+            const ans = document.getElementById('user_answer');
+            if (ans) { ans.focus(); }
+        }, PAUSE_MS);
+    } catch (e) {
+        // no-op
+    }
+}
 
 const nextBtn = document.querySelector('form input[value="next"] , form button');
 const nextFormBtn = document.querySelector('form[action] button');
