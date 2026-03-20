@@ -1,189 +1,58 @@
 [
     {
-        "timestamp": 1772638333,
-        "rounds": 0,
-        "correct": 0,
-        "timed_out": 0,
-        "difficulty": "facil"
-    },
-    {
-        "timestamp": 1772638337,
-        "rounds": 0,
-        "correct": 0,
-        "timed_out": 0,
-        "difficulty": "medio"
-    },
-    {
-        "timestamp": 1772638341,
-        "rounds": 0,
-        "correct": 0,
-        "timed_out": 0,
-        "difficulty": "dificil"
-    },
-    {
-        "timestamp": 1773984555,
-        "rounds": 0,
-        "correct": 0,
-        "timed_out": 0,
-        "difficulty": "medio"
-    },
-    {
-        "timestamp": 1773984581,
-        "rounds": 1,
+        "timestamp": 1774017498,
+        "rounds": 3,
         "correct": 1,
+        "timed_out": 1,
+        "incorrect": 2,
+        "difficulty": "dificil"
+    },
+    {
+        "timestamp": 1774017725,
+        "rounds": 0,
+        "correct": 0,
         "timed_out": 0,
+        "incorrect": 0,
         "difficulty": "facil"
     },
     {
-        "timestamp": 1773984995,
-        "rounds": 10,
-        "correct": 10,
+        "timestamp": 1774017746,
+        "rounds": 0,
+        "correct": 0,
         "timed_out": 0,
         "incorrect": 0,
         "difficulty": "facil"
     },
     {
-        "timestamp": 1773985057,
-        "rounds": 7,
-        "correct": 5,
-        "timed_out": 2,
-        "incorrect": 0,
-        "difficulty": "medio"
-    },
-    {
-        "timestamp": 1773985116,
-        "rounds": 9,
-        "correct": 3,
-        "timed_out": 2,
-        "incorrect": 4,
-        "difficulty": "dificil"
-    },
-    {
-        "timestamp": 1773985126,
-        "rounds": 9,
-        "correct": 3,
-        "timed_out": 2,
-        "incorrect": 4,
-        "difficulty": "dificil"
-    },
-    {
-        "timestamp": 1773985127,
-        "rounds": 9,
-        "correct": 3,
-        "timed_out": 2,
-        "incorrect": 4,
-        "difficulty": "dificil"
-    },
-    {
-        "timestamp": 1773985127,
-        "rounds": 9,
-        "correct": 3,
-        "timed_out": 2,
-        "incorrect": 4,
-        "difficulty": "dificil"
-    },
-    {
-        "timestamp": 1773985127,
-        "rounds": 9,
-        "correct": 3,
-        "timed_out": 2,
-        "incorrect": 4,
-        "difficulty": "dificil"
-    },
-    {
-        "timestamp": 1773985128,
-        "rounds": 9,
-        "correct": 3,
-        "timed_out": 2,
-        "incorrect": 4,
-        "difficulty": "dificil"
-    },
-    {
-        "timestamp": 1773985415,
-        "rounds": 18,
-        "correct": 18,
+        "timestamp": 1774017768,
+        "rounds": 2,
+        "correct": 0,
         "timed_out": 0,
-        "incorrect": 0,
-        "difficulty": "medio"
+        "incorrect": 2,
+        "difficulty": "facil"
     },
     {
-        "timestamp": 1773985423,
-        "rounds": 18,
-        "correct": 18,
-        "timed_out": 0,
-        "incorrect": 0,
-        "difficulty": "medio"
-    },
-    {
-        "timestamp": 1773985508,
-        "rounds": 1,
+        "timestamp": 1774018273,
+        "rounds": 2,
         "correct": 0,
         "timed_out": 1,
-        "incorrect": 0,
-        "difficulty": "medio"
-    },
-    {
-        "timestamp": 1773985698,
-        "rounds": 12,
-        "correct": 12,
-        "timed_out": 0,
-        "incorrect": 0,
-        "difficulty": "medio"
-    },
-    {
-        "timestamp": 1773985866,
-        "rounds": 12,
-        "correct": 12,
-        "timed_out": 0,
-        "incorrect": 0,
-        "difficulty": "medio"
-    },
-    {
-        "timestamp": 1773985895,
-        "rounds": 6,
-        "correct": 4,
-        "timed_out": 0,
         "incorrect": 2,
         "difficulty": "medio"
     },
     {
-        "timestamp": 1773985939,
-        "rounds": 6,
-        "correct": 4,
-        "timed_out": 0,
+        "timestamp": 1774018294,
+        "rounds": 2,
+        "correct": 0,
+        "timed_out": 1,
         "incorrect": 2,
         "difficulty": "medio"
     },
     {
-        "timestamp": 1773985979,
-        "rounds": 10,
-        "correct": 9,
-        "timed_out": 0,
-        "incorrect": 1,
-        "difficulty": "medio"
-    },
-    {
-        "timestamp": 1773986144,
-        "rounds": 10,
-        "correct": 9,
-        "timed_out": 0,
-        "incorrect": 1,
-        "difficulty": "medio"
-    },
-    {
-        "timestamp": 1773986180,
-        "rounds": 10,
-        "correct": 9,
-        "timed_out": 0,
-        "incorrect": 1,
-        "difficulty": "medio"
-    },
-    {
-        "timestamp": 1773986238,
-        "rounds": 15,
-        "correct": 14,
-        "timed_out": 0,
-        "incorrect": 1,
+        "timestamp": 1774018385,
+        "rounds": 2,
+        "correct": 0,
+        "timed_out": 1,
+        "incorrect": 2,
         "difficulty": "medio"
     }
 ]

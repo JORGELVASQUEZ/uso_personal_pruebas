@@ -3,16 +3,25 @@ session_start();
 
 function generate_problem($max = 20, $difficulty = 'medio') {
     if ($difficulty === 'facil') {
-        $ops = ['+', '-'];
+        $ops = ['+', '-', '*'];
         $op = $ops[array_rand($ops)];
-        $a = rand(0, max(5, intval($max/2)));
-        $b = rand(0, max(5, intval($max/2)));
-        $expr = "$a $op $b";
-        // Evaluar la expresión tal cual para permitir resultados negativos (p.ej. 9 - 13 = -4)
-        $safe = preg_replace('/[^0-9+\-\*\/\s]/', '', $expr);
-        $answer_val = 0;
-        try { $answer_val = @eval('return (' . $safe . ');'); } catch (Exception $e) { $answer_val = 0; }
-        $answer = intval($answer_val);
+        
+        if ($op === '*') {
+            // Multiplicaciones simples para fácil
+            $a = rand(2, 5);
+            $b = rand(2, max(5, intval($max/3)));
+            $answer = $a * $b;
+            $expr = "$a $op $b";
+        } else {
+            $a = rand(0, max(5, intval($max/2)));
+            $b = rand(0, max(5, intval($max/2)));
+            $expr = "$a $op $b";
+            // Evaluar la expresión tal cual para permitir resultados negativos (p.ej. 9 - 13 = -4)
+            $safe = preg_replace('/[^0-9+\-\*\/\s]/', '', $expr);
+            $answer_val = 0;
+            try { $answer_val = @eval('return (' . $safe . ');'); } catch (Exception $e) { $answer_val = 0; }
+            $answer = intval($answer_val);
+        }
     } elseif ($difficulty === 'dificil') {
         if (rand(1,100) <= 50) {
             $ops = ['+', '-', '*', '/'];
@@ -58,15 +67,20 @@ function generate_problem($max = 20, $difficulty = 'medio') {
             $expr = "$a $op $b";
         }
     } else {
-        $ops = ['+','-','*'];
+        $ops = ['+','-','*','/'];
         $op = $ops[array_rand($ops)];
         if ($op == '*') {
-            $a = rand(0, max(2,intval($max/2)));
-            $b = rand(0, max(2,intval($max/2)));
+            $a = rand(2, max(3,intval($max/3)));
+            $b = rand(3, max(5,intval($max/4)));
             $answer = $a * $b;
+        } elseif ($op == '/') {
+            $b = rand(2, max(3,intval($max/5)));
+            $q = rand(2, max(3,intval($max/6)));
+            $a = $b * $q;
+            $answer = $q;
         } else {
-            $a = rand(0, $max);
-            $b = rand(0, $max);
+            $a = rand(0, intval($max/2));
+            $b = rand(0, intval($max/2));
             $expr = "$a $op $b";
             $safe = preg_replace('/[^0-9+\-\*\/\s]/', '', $expr);
             $answer_val = 0;
@@ -112,9 +126,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $difficulty = in_array($difficulty, ['facil','medio','dificil']) ? $difficulty : 'medio';
 
     $map = [
-        'facil' => ['max' => 10, 'time' => 15, 'attempts' => 3],
-        'medio' => ['max' => 20, 'time' => 10, 'attempts' => 2],
-        'dificil' => ['max' => 50, 'time' => 7, 'attempts' => 1],
+        'facil' => ['max' => 15, 'time' => 12, 'attempts' => 2],
+        'medio' => ['max' => 30, 'time' => 18, 'attempts' => 1],
+        'dificil' => ['max' => 50, 'time' => 15, 'attempts' => 1],
     ];
     $defaults = $map[$difficulty];
 
@@ -346,7 +360,7 @@ $recent_scores = load_recent_scores(5);
     <?php endif; ?>
 
     <footer>
-        <p>Escribe <strong>q</strong> o pulsa "Salir" para terminar el juego en cualquier momento.</p>
+        <p>Pulsa <strong>"Salir"</strong> para terminar el juego en cualquier momento.</p>
     </footer>
 </div>
 
