@@ -136,7 +136,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if (trim((string)$time_raw) === '') {
         $time_limit = $defaults['time'];
     } else {
-        $time_limit = max(1, intval($time_raw));
+        // Forzar un mínimo de 3 segundos
+        $time_limit = max(3, intval($time_raw));
     }
 
     $attempts_raw = $_POST['attempts'] ?? '';
@@ -315,9 +316,9 @@ $recent_scores = load_recent_scores(5);
             
             <div class="input-group">
                 <label>Tiempo por pregunta (segundos):</label>
-                <div class="input-control">
+                    <div class="input-control">
                     <button type="button" class="btn-control" id="timeDecrement">−</button>
-                    <input name="time_limit" type="number" value="" min="1" placeholder="por defecto" id="timeInput" class="input-small">
+                    <input name="time_limit" type="number" value="" min="3" placeholder="por defecto" id="timeInput" class="input-small">
                     <button type="button" class="btn-control" id="timeIncrement">+</button>
                 </div>
             </div>
@@ -527,8 +528,10 @@ function setupControlButtons(decrementBtn, incrementBtn, inputEl) {
   if (!decrementBtn || !incrementBtn || !inputEl) return;
   
   function updateValue(delta) {
-    let val = parseInt(inputEl.value) || 1;
-    val = Math.max(1, val + delta);
+        let minVal = parseInt(inputEl.getAttribute('min')) || 1;
+        let val = parseInt(inputEl.value);
+        if (isNaN(val)) val = minVal;
+        val = Math.max(minVal, val + delta);
     inputEl.value = val;
     
     // Animar el input
@@ -559,9 +562,10 @@ function setupControlButtons(decrementBtn, incrementBtn, inputEl) {
   
   // Asegurar que sea un número válido al cambiar
   inputEl.addEventListener('blur', function() {
-    if (this.value && parseInt(this.value) < 1) {
-      this.value = 1;
-    }
+        let minVal = parseInt(this.getAttribute('min')) || 1;
+        if (this.value && parseInt(this.value) < minVal) {
+            this.value = minVal;
+        }
   });
 }
 
