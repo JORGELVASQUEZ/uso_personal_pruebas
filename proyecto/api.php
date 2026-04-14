@@ -9,6 +9,11 @@ const DB_NAME = 'order_flow';
 const DB_USER = 'root';
 const DB_PASS = '';
 
+/**
+ * Envía una respuesta JSON y termina la ejecución.
+ * @param array $payload Datos que se enviarán como JSON.
+ * @param int $statusCode Código HTTP de la respuesta (por defecto 200).
+ */
 function jsonResponse(array $payload, int $statusCode = 200): void
 {
     http_response_code($statusCode);
@@ -16,6 +21,11 @@ function jsonResponse(array $payload, int $statusCode = 200): void
     exit;
 }
 
+/**
+ * Recupera los datos de la petición POST/RAW y devuelve un array.
+ * Intenta usar $_POST primero y, si está vacío, parsea el contenido raw del body.
+ * @return array Datos de la petición.
+ */
 function getRequestData(): array
 {
     if (!empty($_POST)) {
@@ -33,6 +43,11 @@ function getRequestData(): array
     return is_array($parsed) ? $parsed : [];
 }
 
+/**
+ * Crea y devuelve una conexión PDO a la base de datos.
+ * Si la base de datos no existe, la crea primero (bootstrap).
+ * @return PDO Conexión PDO lista para usarse.
+ */
 function getConnection(): PDO
 {
     $bootstrapDsn = 'mysql:host=' . DB_HOST . ';charset=utf8mb4';
@@ -53,6 +68,11 @@ function getConnection(): PDO
     ]);
 }
 
+/**
+ * Crea (si no existen) las tablas necesarias en la base de datos.
+ * Define las tablas 'comprador', 'carts' y 'cart_items' y limpia claves foráneas conflictivas.
+ * @param PDO $pdo Conexión PDO sobre la cual aplicar el esquema.
+ */
 function bootstrapSchema(PDO $pdo): void
 {
     $pdo->exec(
@@ -112,6 +132,11 @@ function bootstrapSchema(PDO $pdo): void
     );
 }
 
+/**
+ * Mapea una fila de la tabla 'comprador' a un array de usuario estandarizado usado por la API.
+ * @param array $row Fila de la tabla comprador.
+ * @return array Datos de usuario normalizados.
+ */
 function mapUser(array $row): array
 {
     $nombres = isset($row['nombres']) ? trim((string) $row['nombres']) : '';
@@ -132,6 +157,11 @@ function mapUser(array $row): array
     ];
 }
 
+/**
+ * Devuelve el usuario actualmente autenticado (si existe) mapeado, o null si no hay sesión.
+ * @param PDO $pdo Conexión PDO para buscar el usuario.
+ * @return array|null Usuario mapeado o null.
+ */
 function currentUser(PDO $pdo): ?array
 {
     $buyerPhone = isset($_SESSION['comprador_phone']) ? (int) $_SESSION['comprador_phone'] : 0;
@@ -151,6 +181,12 @@ function currentUser(PDO $pdo): ?array
     return mapUser($user);
 }
 
+/**
+ * Busca el id del carrito asociado a un usuario registrado.
+ * @param PDO $pdo Conexión PDO.
+ * @param int $userId Id del usuario.
+ * @return int|null Id del carrito o null si no existe.
+ */
 function findCartIdByUser(PDO $pdo, int $userId): ?int
 {
     $stmt = $pdo->prepare('SELECT id FROM carts WHERE user_id = :user_id LIMIT 1');
@@ -160,6 +196,12 @@ function findCartIdByUser(PDO $pdo, int $userId): ?int
     return $row ? (int) $row['id'] : null;
 }
 
+/**
+ * Busca el id del carrito asociado a un token de sesión (invitado).
+ * @param PDO $pdo Conexión PDO.
+ * @param string $sessionToken Token de sesión.
+ * @return int|null Id del carrito o null si no existe.
+ */
 function findCartIdBySession(PDO $pdo, string $sessionToken): ?int
 {
     $stmt = $pdo->prepare('SELECT id FROM carts WHERE session_token = :session_token LIMIT 1');
@@ -169,6 +211,10 @@ function findCartIdBySession(PDO $pdo, string $sessionToken): ?int
     return $row ? (int) $row['id'] : null;
 }
 
+/**
+ * Crea un nuevo carrito y devuelve su id.
+ * Puede asociarse a un usuario (user_id) o a un session_token para invitados.
+ */
 function createCart(PDO $pdo, ?int $userId, ?string $sessionToken): int
 {
     $stmt = $pdo->prepare('INSERT INTO carts (user_id, session_token) VALUES (:user_id, :session_token)');
@@ -180,6 +226,10 @@ function createCart(PDO $pdo, ?int $userId, ?string $sessionToken): int
     return (int) $pdo->lastInsertId();
 }
 
+/**
+ * Fusiona el carrito temporal de sesión de un invitado en el carrito del usuario al iniciar sesión.
+ * Si ambos carritos existen, combina cantidades y borra el carrito de sesión.
+ */
 function mergeSessionCartIntoUser(PDO $pdo, int $userId, string $sessionToken): void
 {
     $sessionCartId = findCartIdBySession($pdo, $sessionToken);
@@ -227,6 +277,9 @@ function mergeSessionCartIntoUser(PDO $pdo, int $userId, string $sessionToken): 
     ]);
 }
 
+/**
+ * Devuelve el id del carrito existente para un usuario o sesión, o crea uno nuevo si no existe.
+ */
 function getOrCreateCartId(PDO $pdo, ?int $userId, string $sessionToken): int
 {
     if ($userId !== null) {
@@ -256,6 +309,10 @@ function getOrCreateCartId(PDO $pdo, ?int $userId, string $sessionToken): int
     return createCart($pdo, null, $sessionToken);
 }
 
+/**
+ * Carga los items de un carrito dado (usuario o sesión) y los devuelve como array.
+ * @return array Lista de items con id, name, price, image y quantity.
+ */
 function loadCart(PDO $pdo, ?int $userId, string $sessionToken): array
 {
     $cartId = getOrCreateCartId($pdo, $userId, $sessionToken);
@@ -282,6 +339,10 @@ function loadCart(PDO $pdo, ?int $userId, string $sessionToken): array
     return $items;
 }
 
+/**
+ * Guarda (reemplaza) el contenido del carrito en la base de datos.
+ * Recibe un array de items y los inserta en la tabla cart_items dentro de una transacción.
+ */
 function saveCart(PDO $pdo, ?int $userId, string $sessionToken, array $cart): void
 {
     $cartId = getOrCreateCartId($pdo, $userId, $sessionToken);

@@ -24,6 +24,12 @@ let cart = [];
 // Usuario actual
 let currentUser = null;
 
+/**
+ * Añade un valor a un objeto URLSearchParams soportando arrays y objetos anidados.
+ * @param {URLSearchParams} params El objeto donde se agregan los pares clave/valor.
+ * @param {string} key La clave actual.
+ * @param {*} value El valor (puede ser primitivo, array u objeto).
+ */
 function appendFormValue(params, key, value) {
     if (Array.isArray(value)) {
         value.forEach((item, index) => {
@@ -42,6 +48,12 @@ function appendFormValue(params, key, value) {
     params.append(key, value ?? '');
 }
 
+/**
+ * Hace una petición a la API interna (`api.php?action=...`) y devuelve la respuesta JSON.
+ * @param {string} action Acción a solicitar en la API.
+ * @param {object|null} body Cuerpo a enviar (se serializa como application/x-www-form-urlencoded).
+ * @param {string} method Método HTTP (por defecto POST).
+ */
 async function apiRequest(action, body = null, method = 'POST') {
     const options = { method };
 
@@ -70,6 +82,9 @@ async function apiRequest(action, body = null, method = 'POST') {
     return data;
 }
 
+/**
+ * Persiste el carrito actual en el servidor llamando a la API 'save_cart'.
+ */
 async function persistCart() {
     const response = await apiRequest('save_cart', { cart });
     if (!response.success) {
@@ -78,6 +93,9 @@ async function persistCart() {
 }
 
 // Inicializar datos
+/**
+ * Inicializa datos de sesión desde la API ('session_state'), carga carrito y usuario.
+ */
 async function initData() {
     const response = await apiRequest('session_state', null, 'GET');
 
@@ -92,6 +110,11 @@ async function initData() {
 }
 
 // Generar estrellas de calificación
+/**
+ * Genera el HTML de las estrellas de valoración (completas, medias y vacías).
+ * @param {number} rating Puntuación entre 0 y 5.
+ * @returns {string} HTML con los iconos de estrellas.
+ */
 function generateRatingStars(rating) {
     let stars = '';
     const fullStars = Math.floor(rating);
@@ -114,6 +137,11 @@ function generateRatingStars(rating) {
 }
 
 // Mostrar notificación
+/**
+ * Muestra una notificación temporal en pantalla.
+ * @param {string} message Texto a mostrar.
+ * @param {string} [type='success'] Tipo de notificación: 'success'|'error'|'warning'.
+ */
 function showNotification(message, type = 'success') {
     // Crear elemento de notificación
     const notification = document.createElement('div');
@@ -144,6 +172,9 @@ function showNotification(message, type = 'success') {
 }
 
 // Actualizar carrito
+/**
+ * Renderiza el contenido del carrito en la UI, calcula totales y registra eventos de los botones.
+ */
 function updateCart() {
     const cartItemsContainer = document.getElementById('cart-items');
     const cartCountElement = document.querySelector('.cart-count');
@@ -215,6 +246,10 @@ function updateCart() {
 }
 
 // Agregar producto al carrito
+/**
+ * Añade un producto al carrito (aumenta cantidad si ya existe).
+ * @param {number} productId Id del producto a añadir.
+ */
 function addToCart(productId) {
     // Buscar el producto en productos o ofertas
     let product = products.find(p => p.id === productId);
@@ -244,6 +279,10 @@ function addToCart(productId) {
 }
 
 // Disminuir cantidad de producto en el carrito
+/**
+ * Disminuye la cantidad de un item en el carrito; lo elimina si llega a 0.
+ * @param {number} productId Id del producto.
+ */
 function decreaseQuantity(productId) {
     const item = cart.find(item => item.id === productId);
     
@@ -260,6 +299,10 @@ function decreaseQuantity(productId) {
 }
 
 // Aumentar cantidad de producto en el carrito
+/**
+ * Aumenta la cantidad de un item en el carrito.
+ * @param {number} productId Id del producto.
+ */
 function increaseQuantity(productId) {
     const item = cart.find(item => item.id === productId);
     
@@ -270,6 +313,10 @@ function increaseQuantity(productId) {
 }
 
 // Eliminar producto del carrito
+/**
+ * Elimina un producto del carrito por su id.
+ * @param {number} productId Id del producto a eliminar.
+ */
 function removeFromCart(productId) {
     cart = cart.filter(item => item.id !== productId);
     updateCart();
@@ -277,6 +324,9 @@ function removeFromCart(productId) {
 }
 
 // Inicializar carrito
+/**
+ * Inicializa la lógica del sidebar del carrito (abrir/cerrar) y eventos de 'Agregar al carrito'.
+ */
 function initCart() {
     const openCartButton = document.getElementById('open-cart');
     const closeCartButton = document.getElementById('close-cart');
@@ -316,6 +366,9 @@ function initCart() {
 }
 
 // Actualizar UI según el usuario
+/**
+ * Actualiza la interfaz (botones de login/registro y avatar) según el estado de `currentUser`.
+ */
 function updateUserUI() {
     const userIcon = document.querySelector('.user-icon');
     const authButtons = document.getElementById('auth-buttons');
@@ -351,6 +404,12 @@ function updateUserUI() {
 }
 
 // Función de login
+/**
+ * Intenta autenticar al usuario usando la API y actualiza UI/cart si es exitoso.
+ * @param {string} email Email del usuario.
+ * @param {string} password Contraseña.
+ * @returns {Promise<boolean>} True si el login fue exitoso.
+ */
 async function login(email, password) {
     const response = await apiRequest('login', { email, password });
 
@@ -368,6 +427,11 @@ async function login(email, password) {
 }
 
 // Función de registro
+/**
+ * Registra un nuevo usuario mediante la API y actualiza la sesión local si tuvo éxito.
+ * @param {object} userData Objeto con campos esperados por la API (name, email, password, phone, address).
+ * @returns {Promise<boolean>} True si el registro fue exitoso.
+ */
 async function register(userData) {
     const response = await apiRequest('register', userData);
 
@@ -385,6 +449,9 @@ async function register(userData) {
 }
 
 // Función de logout
+/**
+ * Cierra la sesión del usuario en el servidor y actualiza la UI localmente.
+ */
 async function logout() {
     await apiRequest('logout', {});
     currentUser = null;
@@ -465,9 +532,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadProducts();
         loadOffers();
     }
+
+    // Cargar detalle de producto si estamos en la página de detalle
+    if (window.location.pathname.includes('product-detail.php') || document.getElementById('product-detail')) {
+        renderProductDetail();
+    }
 });
 
 // Cargar productos destacados
+/**
+ * Renderiza la lista de productos destacados en la página principal o de productos.
+ */
 function loadProducts() {
     const productsContainer = document.getElementById('products-container');
     if (!productsContainer) return;
@@ -499,6 +574,9 @@ function loadProducts() {
 }
 
 // Cargar ofertas
+/**
+ * Renderiza la sección de ofertas/descubiertos (productos con descuento).
+ */
 function loadOffers() {
     const offersContainer = document.getElementById('offers-container');
     if (!offersContainer) return;
@@ -535,4 +613,85 @@ function loadOffers() {
         `;
         offersContainer.appendChild(productCard);
     });
+}
+
+// Renderizar detalle de producto según el id en la URL
+/**
+ * Busca el parámetro `id` en la URL, obtiene el producto (de `products` o `offers`) y renderiza
+ * un detalle completo con imagen, nombre, precio, descripción y botón para agregar al carrito.
+ */
+function renderProductDetail() {
+    const container = document.getElementById('product-detail');
+    if (!container) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const idParam = params.get('id');
+
+    if (!idParam) {
+        container.innerHTML = `
+            <div class="not-found">
+                <h3>Producto no especificado</h3>
+                <p>No se indicó el id del producto. <a href="products.php">Volver a productos</a></p>
+            </div>
+        `;
+        return;
+    }
+
+    const id = parseInt(idParam, 10);
+    if (isNaN(id)) {
+        container.innerHTML = `
+            <div class="not-found">
+                <h3>Id inválido</h3>
+                <p>El identificador del producto no es válido. <a href="products.php">Ver productos</a></p>
+            </div>
+        `;
+        return;
+    }
+
+    let product = products.find(p => p.id === id) || offers.find(p => p.id === id);
+
+    if (!product) {
+        container.innerHTML = `
+            <div class="not-found">
+                <h3>Producto no encontrado</h3>
+                <p>No existe un producto con id ${id}. <a href="products.php">Ver productos</a></p>
+            </div>
+        `;
+        return;
+    }
+
+    const priceHtml = (product.originalPrice && product.originalPrice > product.price)
+        ? `<div class="product-price"><span class="price">$${product.price.toFixed(2)}</span> <span class="original">$${product.originalPrice.toFixed(2)}</span></div>`
+        : `<div class="product-price"><span class="price">$${product.price.toFixed(2)}</span></div>`;
+
+    container.innerHTML = `
+        <div class="product-detail-card">
+            <a href="products.php" class="back-link">← Volver a productos</a>
+            <div class="detail-grid">
+                <div class="detail-image">
+                    <img src="${product.image}" alt="${product.name}">
+                </div>
+                <div class="detail-info">
+                    <h2 class="detail-title">${product.name}</h2>
+                    <div class="detail-rating">${generateRatingStars(product.rating)} <span class="rating-number">${product.rating ?? ''}</span></div>
+                    ${priceHtml}
+                    <p class="detail-description">${product.description ?? ''}</p>
+                    <div class="detail-actions">
+                        <button class="add-to-cart btn" data-id="${product.id}"><i class="fas fa-cart-plus"></i> Agregar al carrito</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Permitir que el botón use la misma lógica que la lista para agregar al carrito
+    const addBtn = container.querySelector('.add-to-cart');
+    if (addBtn) {
+        addBtn.addEventListener('click', () => {
+            const pid = parseInt(addBtn.dataset.id, 10);
+            addToCart(pid);
+            // Pequeña animación/feedback
+            showNotification(`${product.name} agregado al carrito`);
+        });
+    }
 }
