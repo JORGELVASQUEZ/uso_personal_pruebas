@@ -2,7 +2,7 @@
 const products = [
     { id: 1, name: "Leche Entera 1L", price: 2.50, image: "https://images.unsplash.com/photo-1550583724-b2692b85b150?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Lácteos", rating: 4.5, description: "Leche entera pasteurizada de alta calidad, rica en calcio y vitaminas." },
     { id: 2, name: "Pan Integral 500g", price: 1.80, image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Panadería", rating: 4.2, description: "Pan integral elaborado con harina de trigo integral, rico en fibra." },
-    { id: 3, name: "Huevos Blancos 12 unid.", price: 3.20, image: "https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Lácteos", rating: 4.7, description: "Huevos blancos frescos de gallinas criadas en libertad." },
+    { id: 3, name: "Huevos Blancos 12 unid.", price: 3.20, image: "https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Huevos", rating: 4.7, description: "Huevos blancos frescos de gallinas criadas en libertad." },
     { id: 4, name: "Arroz Extra 1kg", price: 2.10, image: "https://www.vegaucero.com/multimedia/web/vega-ucero/catalogo/pro/5188/16008810781383125803.jpg", category: "Granos", rating: 4.4, description: "Arroz extra de grano largo, ideal para todo tipo de preparaciones." },
     { id: 5, name: "Aceite de Girasol 1L", price: 3.50, image: "https://images.unsplash.com/photo-1533050487297-09b450131914?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Aceites", rating: 4.0, description: "Aceite de girasol 100% puro, ideal para freír y aderezar." },
     { id: 6, name: "Yogurt Natural 1kg", price: 2.80, image: "https://images.unsplash.com/photo-1565958011703-44f9829ba187?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Lácteos", rating: 4.6, description: "Yogurt natural sin azúcar añadido, rico en probióticos." },
@@ -14,8 +14,8 @@ const products = [
 const offers = [
     { id: 9, name: "Coca-Cola 2L", price: 2.20, originalPrice: 2.80, image: "https://images.unsplash.com/photo-1554866585-cd94860890b7?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Bebidas", rating: 4.8, description: "Refresco Coca-Cola original en presentación familiar." },
     { id: 10, name: "Papas Fritas 200g", price: 1.90, originalPrice: 2.50, image: "https://images.unsplash.com/photo-1566478989037-eec170784d0b?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Snacks", rating: 4.5, description: "Papas fritas crujientes con sabor natural." },
-    { id: 11, name: "Chocolate 100g", price: 1.50, originalPrice: 2.00, image: "https://images.unsplash.com/photo-1541783245831-57d6fb0926d3?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Dulces", rating: 4.7, description: "Chocolate con leche de alta calidad." },
-    { id: 12, name: "Galletas Integrales", price: 1.30, originalPrice: 1.80, image: "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Galletas", rating: 4.3, description: "Galletas integrales con avena y miel." }
+    { id: 11, name: "Chocolate 100g", price: 1.50, originalPrice: 2.00, image: "https://images.unsplash.com/photo-1541783245831-57d6fb0926d3?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Snacks", rating: 4.7, description: "Chocolate con leche de alta calidad." },
+    { id: 12, name: "Galletas Integrales", price: 1.30, originalPrice: 1.80, image: "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Snacks", rating: 4.3, description: "Galletas integrales con avena y miel." }
 ];
 
 // Carrito de compras
