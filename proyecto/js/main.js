@@ -325,7 +325,8 @@ function removeFromCart(productId) {
 
 // Inicializar carrito
 /**
- * Inicializa la lógica del sidebar del carrito (abrir/cerrar) y eventos de 'Agregar al carrito'.
+ * Inicializa la lógica del sidebar del carrito (abrir/cerrar).
+ * Los eventos de agregar al carrito ahora se manejan individualmente en cada botón.
  */
 function initCart() {
     const openCartButton = document.getElementById('open-cart');
@@ -353,13 +354,8 @@ function initCart() {
         document.body.style.overflow = 'auto';
     });
     
-    // Agregar eventos a los botones "Agregar al carrito"
-    document.addEventListener('click', (e) => {
-        if (e.target.closest('.add-to-cart')) {
-            const productId = parseInt(e.target.closest('.add-to-cart').dataset.id);
-            addToCart(productId);
-        }
-    });
+    // Eliminamos el evento global que escuchaba clics en '.add-to-cart'
+    // porque ahora cada botón maneja su propio evento
     
     // Cargar carrito inicial
     updateCart();
@@ -636,14 +632,11 @@ function loadProducts(category = null) {
 
     const selected = category ? normalize(category) : null;
 
-    // show a subtle loader so the user sees feedback when filtering
     showLoader();
 
-    // Defer rendering slightly so the loader can paint (makes the spinner visible for very fast ops)
     setTimeout(() => {
         productsContainer.innerHTML = '';
 
-        // Categories that are considered part of 'supermercado'
         const supermercadoGroup = new Set(['supermercado', 'huevos', 'granos', 'aceites', 'pastas', 'verduras', 'farmacia', 'farmacias']);
 
         const filtered = products.filter(p => {
@@ -655,7 +648,6 @@ function loadProducts(category = null) {
             return cat === selected;
         });
 
-        // If no products match and selected is set, show a friendly message
         if (selected && filtered.length === 0) {
             productsContainer.innerHTML = `<p>No se encontraron productos para la categoría seleccionada.</p>`;
             hideLoader();
@@ -682,10 +674,99 @@ function loadProducts(category = null) {
                     </button>
                 </div>
             `;
+            
+            // IMPORTANTE: Evitar que el clic en el botón navegue al enlace padre
+            const addButton = productCard.querySelector('.add-to-cart');
+            addButton.addEventListener('click', (e) => {
+                e.preventDefault();  // Evita comportamiento por defecto
+                e.stopPropagation();  // Detiene la propagación al elemento padre <a>
+                const productId = parseInt(e.currentTarget.dataset.id);
+                addToCart(productId);
+            });
+            
             productsContainer.appendChild(productCard);
         });
 
-        // small delay to ensure DOM painted before hiding loader for smoothness
+        setTimeout(hideLoader, 120);
+    }, 120);
+}
+
+// Cargar ofertas
+/**
+ * Renderiza la sección de ofertas/descubiertos (productos con descuento).
+ */
+function loadOffers(category = null) {
+    const offersContainer = document.getElementById('offers-container');
+    if (!offersContainer) return;
+
+    const normalize = (s) => {
+        if (!s) return '';
+        try {
+            return String(s).toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
+        } catch (e) {
+            return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        }
+    };
+
+    const selected = category ? normalize(category) : null;
+
+    showLoader();
+
+    setTimeout(() => {
+        offersContainer.innerHTML = '';
+
+        const supermercadoGroup = new Set(['supermercado', 'huevos', 'granos', 'aceites', 'pastas', 'verduras', 'farmacia', 'farmacias']);
+
+        const filtered = offers.filter(p => {
+            if (!selected) return true;
+            const cat = normalize(p.category);
+            if (selected === 'supermercado') {
+                return supermercadoGroup.has(cat) || cat === selected;
+            }
+            return cat === selected;
+        });
+
+        filtered.forEach(product => {
+            const discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
+
+            const productCard = document.createElement('a');
+            productCard.className = 'product-card';
+            productCard.href = `product-detail.php?id=${product.id}`;
+            productCard.innerHTML = `
+                <div style="position: absolute; top: 10px; left: 10px; background-color: var(--primary-color); color: white; padding: 5px 10px; border-radius: 4px; font-weight: bold; z-index: 1;">
+                    -${discount}%
+                </div>
+                <div class="product-image">
+                    <img src="${product.image}" alt="${product.name}">
+                </div>
+                <div class="product-info">
+                    <h4 class="product-title">${product.name}</h4>
+                    <div class="product-rating">
+                        ${generateRatingStars(product.rating)}
+                        <span style="color: var(--gray-color); font-size: 0.9rem;">${product.rating}</span>
+                    </div>
+                    <div class="product-price">
+                        <span style="color: var(--primary-color); font-size: 1.3rem; font-weight: 700;">$${product.price.toFixed(2)}</span>
+                        <span style="color: var(--gray-color); text-decoration: line-through; margin-left: 5px; font-size: 1rem;">$${product.originalPrice.toFixed(2)}</span>
+                    </div>
+                    <button class="add-to-cart" data-id="${product.id}">
+                        <i class="fas fa-cart-plus"></i> Agregar
+                    </button>
+                </div>
+            `;
+            
+            // IMPORTANTE: Evitar que el clic en el botón navegue al enlace padre
+            const addButton = productCard.querySelector('.add-to-cart');
+            addButton.addEventListener('click', (e) => {
+                e.preventDefault();  // Evita comportamiento por defecto
+                e.stopPropagation();  // Detiene la propagación al elemento padre <a>
+                const productId = parseInt(e.currentTarget.dataset.id);
+                addToCart(productId);
+            });
+            
+            offersContainer.appendChild(productCard);
+        });
+
         setTimeout(hideLoader, 120);
     }, 120);
 }
