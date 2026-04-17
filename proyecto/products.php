@@ -10,27 +10,51 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <!-- Header (unificado con index.php) -->
     <header>
-        <nav class="navbar">
-            <a class="logo" href="index.php">PedidoReserve</a>
-            <div class="nav-actions">
-                <div class="user-icon"></div>
-                <div id="auth-buttons"></div>
-                <button id="open-cart" class="btn">Carrito (<span class="cart-count">0</span>)</button>
+        <div class="container">
+            <div class="header-top">
+                <div class="logo">
+                    <a href="index.php">
+                        <i class="fas fa-bolt logo-icon"></i>
+                        <h1>RapiMarket</h1>
+                    </a>
+                </div>
+
+                <div class="search-bar">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Buscar productos...">
+                </div>
+
+                <div class="header-actions">
+                    <div class="user-icon"></div>
+                    <div id="auth-buttons"></div>
+                    <div class="cart-icon" id="open-cart">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span class="cart-count">0</span>
+                    </div>
+                    <div class="hamburger">
+                        <i class="fas fa-bars"></i>
+                    </div>
+                </div>
             </div>
-        </nav>
+
+            <div class="header-bottom">
+                <ul class="categories">
+                    <li><a href="products.php" class="active">Todos</a></li>
+                    <li><a href="products.php?category=supermercado">Supermercado</a></li>
+                    <li><a href="products.php?category=bebidas">Bebidas</a></li>
+                    <li><a href="products.php?category=lacteos">Lácteos</a></li>
+                    <li><a href="products.php?category=snacks">Snacks</a></li>
+                </ul>
+            </div>
+        </div>
     </header>
 
     <main class="container">
         <section class="products-section">
             <h2>Productos</h2>
-            <div class="categories">
-                <a href="products.php" class="active">Todos</a>
-                <a href="products.php?category=supermercado">Supermercado</a>
-                <a href="products.php?category=farmacia">Farmacia</a>
-                <a href="products.php?category=bebidas">Bebidas</a>
-                <a href="products.php?category=lácteos">Lácteos</a>
-            </div>
+            <!-- Duplicate category selector removed (header contains category links) -->
 
             <div id="offers-container" class="offers-container"></div>
 

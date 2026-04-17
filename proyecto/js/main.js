@@ -4,8 +4,8 @@ const products = [
     { id: 2, name: "Pan Integral 500g", price: 1.80, image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Panadería", rating: 4.2, description: "Pan integral elaborado con harina de trigo integral, rico en fibra." },
     { id: 3, name: "Huevos Blancos 12 unid.", price: 3.20, image: "https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Huevos", rating: 4.7, description: "Huevos blancos frescos de gallinas criadas en libertad." },
     { id: 4, name: "Arroz Extra 1kg", price: 2.10, image: "https://www.vegaucero.com/multimedia/web/vega-ucero/catalogo/pro/5188/16008810781383125803.jpg", category: "Granos", rating: 4.4, description: "Arroz extra de grano largo, ideal para todo tipo de preparaciones." },
-    { id: 5, name: "Aceite de Girasol 1L", price: 3.50, image: "https://images.unsplash.com/photo-1533050487297-09b450131914?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Aceites", rating: 4.0, description: "Aceite de girasol 100% puro, ideal para freír y aderezar." },
-    { id: 6, name: "Yogurt Natural 1kg", price: 2.80, image: "https://images.unsplash.com/photo-1565958011703-44f9829ba187?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Lácteos", rating: 4.6, description: "Yogurt natural sin azúcar añadido, rico en probióticos." },
+    { id: 5, name: "Aceite de Girasol 1L", price: 3.50, image: "https://aceitesandua.com/wp-content/uploads/2021/05/211fb1d06f9479a7650fc3bb47b93c8b.jpg", category: "Aceites", rating: 4.0, description: "Aceite de girasol 100% puro, ideal para freír y aderezar." },
+    { id: 6, name: "Yogurt Natural 1kg", price: 2.80, image: "https://s1.abcstatics.com/media/bienestar/2019/07/26/yogur-ktEF--1248x698@abc.jpg", category: "Lácteos", rating: 4.6, description: "Yogurt natural sin azúcar añadido, rico en probióticos." },
     { id: 7, name: "Pasta Spaghetti 500g", price: 1.60, image: "https://images.unsplash.com/photo-1551183053-bf91a1d81141?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Pastas", rating: 4.3, description: "Pasta spaghetti de trigo duro, de cocción perfecta." },
     { id: 8, name: "Tomates 1kg", price: 2.40, image: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Verduras", rating: 4.1, description: "Tomates frescos y jugosos, cultivados localmente." }
 ];
@@ -14,7 +14,7 @@ const products = [
 const offers = [
     { id: 9, name: "Coca-Cola 2L", price: 2.20, originalPrice: 2.80, image: "https://images.unsplash.com/photo-1554866585-cd94860890b7?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Bebidas", rating: 4.8, description: "Refresco Coca-Cola original en presentación familiar." },
     { id: 10, name: "Papas Fritas 200g", price: 1.90, originalPrice: 2.50, image: "https://images.unsplash.com/photo-1566478989037-eec170784d0b?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Snacks", rating: 4.5, description: "Papas fritas crujientes con sabor natural." },
-    { id: 11, name: "Chocolate 100g", price: 1.50, originalPrice: 2.00, image: "https://images.unsplash.com/photo-1541783245831-57d6fb0926d3?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Snacks", rating: 4.7, description: "Chocolate con leche de alta calidad." },
+    { id: 11, name: "Chocolate 100g", price: 1.50, originalPrice: 2.00, image: "https://perfectdailygrind.com/es/wp-content/uploads/sites/2/2020/04/Hs_5Ce8ecmXodh-AdEVHyT07irPaZ-zAAhYkKYRJgS5CVzHKs0cAAdyeAF9TIgyh4KI5gqYmyuIDwJnf2f9wCdNvJ5WbQOlSoRr5zmmzMalyR1-RQxvlOtTZkJq9G_GPUiVZ6_WX-1.jpeg", category: "Snacks", rating: 4.7, description: "Chocolate con leche de alta calidad." },
     { id: 12, name: "Galletas Integrales", price: 1.30, originalPrice: 1.80, image: "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Snacks", rating: 4.3, description: "Galletas integrales con avena y miel." }
 ];
 
@@ -521,98 +521,245 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Agregar clase active al enlace clickeado
             link.classList.add('active');
             
+                // Obtener category desde el href (si existe) y actualizar la URL sin recargar
+            const href = link.getAttribute('href') || '';
+            const params = new URLSearchParams(href.split('?')[1] || '');
+            let categoryParam = params.get('category');
+            // si el enlace apuntaba a una subcategoría que ahora forma parte de supermercado,
+            // normalizamos y la redirigimos a 'supermercado'
+            const merged = ['huevos','granos','aceites','pastas','verduras','farmacia','farmacias'];
+            if (categoryParam && merged.includes(categoryParam.toLowerCase())) {
+                categoryParam = 'supermercado';
+            }
+
+            // update URL using history API so users can bookmark
+            const newPath = categoryParam ? `products.php?category=${encodeURIComponent(categoryParam)}` : 'products.php';
+            history.pushState({ category: categoryParam }, '', newPath);
+
+                // Recargar la lista filtrada (productos y ofertas)
+                loadProducts(categoryParam);
+                loadOffers(categoryParam);
+
             // Mostrar notificación de filtro aplicado
             const category = link.textContent;
             showNotification(`Filtrado por: ${category}`);
         });
     });
     
+    // Helper: normalizar nombres de categoría (quita acentos y lower-case)
+    function normalizeCategoryName(str) {
+        if (!str) return '';
+        try {
+            return String(str).toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
+        } catch (e) {
+            // Fallback for older browsers without \p{Diacritic}
+            return String(str).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        }
+    }
+
+    // Map specific categories into 'supermercado' (handles legacy links/bookmarks)
+    function mapToSupermercado(cat) {
+        if (!cat) return cat;
+        const m = normalizeCategoryName(cat);
+        const merged = new Set(['huevos','granos','aceites','pastas','verduras','farmacia','farmacias']);
+        if (merged.has(m)) return 'supermercado';
+        return cat;
+    }
+
     // Cargar productos si estamos en la página de productos
     if (window.location.pathname.includes('products.php') || window.location.pathname.includes('index.php') || window.location.pathname.endsWith('/')) {
-        loadProducts();
-        loadOffers();
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialCategory = mapToSupermercado(urlParams.get('category'));
+
+        // Marcar link activo según query param
+        if (initialCategory) {
+            document.querySelectorAll('.categories a').forEach(link => {
+                const href = link.getAttribute('href') || '';
+                const params = new URLSearchParams(href.split('?')[1] || '');
+                const cat = params.get('category');
+                if (cat && normalizeCategoryName(cat) === normalizeCategoryName(initialCategory)) {
+                    document.querySelectorAll('.categories a').forEach(i => i.classList.remove('active'));
+                    link.classList.add('active');
+                }
+            });
+        }
+
+        loadProducts(initialCategory);
+        loadOffers(initialCategory);
     }
+
+    // Handle back/forward navigation to update category filter
+    window.addEventListener('popstate', (e) => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const cat = mapToSupermercado(urlParams.get('category'));
+        // update active link
+        document.querySelectorAll('.categories a').forEach(link => {
+            const href = link.getAttribute('href') || '';
+            const params = new URLSearchParams(href.split('?')[1] || '');
+            const catLink = params.get('category');
+            if (cat && catLink && normalizeCategoryName(catLink) === normalizeCategoryName(cat)) {
+                document.querySelectorAll('.categories a').forEach(i => i.classList.remove('active'));
+                link.classList.add('active');
+            } else if (!cat && !catLink) {
+                document.querySelectorAll('.categories a').forEach(i => i.classList.remove('active'));
+                link.classList.add('active');
+            }
+        });
+
+        loadProducts(cat);
+        loadOffers(cat);
+    });
 
     // Cargar detalle de producto si estamos en la página de detalle
     if (window.location.pathname.includes('product-detail.php') || document.getElementById('product-detail')) {
         renderProductDetail();
     }
+
 });
 
 // Cargar productos destacados
 /**
  * Renderiza la lista de productos destacados en la página principal o de productos.
  */
-function loadProducts() {
+function loadProducts(category = null) {
     const productsContainer = document.getElementById('products-container');
     if (!productsContainer) return;
-    
-    productsContainer.innerHTML = '';
-    
-    products.forEach(product => {
-        const productCard = document.createElement('a');
-        productCard.className = 'product-card';
-    productCard.href = `product-detail.php?id=${product.id}`;
-        productCard.innerHTML = `
-            <div class="product-image">
-                <img src="${product.image}" alt="${product.name}">
-            </div>
-            <div class="product-info">
-                <h4 class="product-title">${product.name}</h4>
-                <div class="product-rating">
-                    ${generateRatingStars(product.rating)}
-                    <span style="color: var(--gray-color); font-size: 0.9rem;">${product.rating}</span>
+
+    const normalize = (s) => {
+        if (!s) return '';
+        try {
+            return String(s).toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
+        } catch (e) {
+            return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        }
+    };
+
+    const selected = category ? normalize(category) : null;
+
+    // show a subtle loader so the user sees feedback when filtering
+    showLoader();
+
+    // Defer rendering slightly so the loader can paint (makes the spinner visible for very fast ops)
+    setTimeout(() => {
+        productsContainer.innerHTML = '';
+
+        // Categories that are considered part of 'supermercado'
+        const supermercadoGroup = new Set(['supermercado', 'huevos', 'granos', 'aceites', 'pastas', 'verduras', 'farmacia', 'farmacias']);
+
+        const filtered = products.filter(p => {
+            if (!selected) return true;
+            const cat = normalize(p.category);
+            if (selected === 'supermercado') {
+                return supermercadoGroup.has(cat) || cat === selected;
+            }
+            return cat === selected;
+        });
+
+        // If no products match and selected is set, show a friendly message
+        if (selected && filtered.length === 0) {
+            productsContainer.innerHTML = `<p>No se encontraron productos para la categoría seleccionada.</p>`;
+            hideLoader();
+            return;
+        }
+
+        filtered.forEach(product => {
+            const productCard = document.createElement('a');
+            productCard.className = 'product-card';
+            productCard.href = `product-detail.php?id=${product.id}`;
+            productCard.innerHTML = `
+                <div class="product-image">
+                    <img src="${product.image}" alt="${product.name}">
                 </div>
-                <div class="product-price">$${product.price.toFixed(2)}</div>
-                <button class="add-to-cart" data-id="${product.id}">
-                    <i class="fas fa-cart-plus"></i> Agregar
-                </button>
-            </div>
-        `;
-        productsContainer.appendChild(productCard);
-    });
+                <div class="product-info">
+                    <h4 class="product-title">${product.name}</h4>
+                    <div class="product-rating">
+                        ${generateRatingStars(product.rating)}
+                        <span style="color: var(--gray-color); font-size: 0.9rem;">${product.rating}</span>
+                    </div>
+                    <div class="product-price">$${product.price.toFixed(2)}</div>
+                    <button class="add-to-cart" data-id="${product.id}">
+                        <i class="fas fa-cart-plus"></i> Agregar
+                    </button>
+                </div>
+            `;
+            productsContainer.appendChild(productCard);
+        });
+
+        // small delay to ensure DOM painted before hiding loader for smoothness
+        setTimeout(hideLoader, 120);
+    }, 120);
 }
 
 // Cargar ofertas
 /**
  * Renderiza la sección de ofertas/descubiertos (productos con descuento).
  */
-function loadOffers() {
+function loadOffers(category = null) {
     const offersContainer = document.getElementById('offers-container');
     if (!offersContainer) return;
-    
-    offersContainer.innerHTML = '';
-    
-    offers.forEach(product => {
-        const discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
-        
-        const productCard = document.createElement('a');
-        productCard.className = 'product-card';
-    productCard.href = `product-detail.php?id=${product.id}`;
-        productCard.innerHTML = `
-            <div style="position: absolute; top: 10px; left: 10px; background-color: var(--primary-color); color: white; padding: 5px 10px; border-radius: 4px; font-weight: bold; z-index: 1;">
-                -${discount}%
-            </div>
-            <div class="product-image">
-                <img src="${product.image}" alt="${product.name}">
-            </div>
-            <div class="product-info">
-                <h4 class="product-title">${product.name}</h4>
-                <div class="product-rating">
-                    ${generateRatingStars(product.rating)}
-                    <span style="color: var(--gray-color); font-size: 0.9rem;">${product.rating}</span>
+
+    const normalize = (s) => {
+        if (!s) return '';
+        try {
+            return String(s).toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
+        } catch (e) {
+            return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        }
+    };
+
+    const selected = category ? normalize(category) : null;
+
+    // show loader while filtering offers
+    showLoader();
+
+    setTimeout(() => {
+        offersContainer.innerHTML = '';
+
+        // Same supermercado grouping for offers
+        const supermercadoGroup = new Set(['supermercado', 'huevos', 'granos', 'aceites', 'pastas', 'verduras', 'farmacia', 'farmacias']);
+
+        const filtered = offers.filter(p => {
+            if (!selected) return true;
+            const cat = normalize(p.category);
+            if (selected === 'supermercado') {
+                return supermercadoGroup.has(cat) || cat === selected;
+            }
+            return cat === selected;
+        });
+
+        filtered.forEach(product => {
+            const discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
+
+            const productCard = document.createElement('a');
+            productCard.className = 'product-card';
+            productCard.href = `product-detail.php?id=${product.id}`;
+            productCard.innerHTML = `
+                <div style="position: absolute; top: 10px; left: 10px; background-color: var(--primary-color); color: white; padding: 5px 10px; border-radius: 4px; font-weight: bold; z-index: 1;">
+                    -${discount}%
                 </div>
-                <div class="product-price">
-                    <span style="color: var(--primary-color); font-size: 1.3rem; font-weight: 700;">$${product.price.toFixed(2)}</span>
-                    <span style="color: var(--gray-color); text-decoration: line-through; margin-left: 5px; font-size: 1rem;">$${product.originalPrice.toFixed(2)}</span>
+                <div class="product-image">
+                    <img src="${product.image}" alt="${product.name}">
                 </div>
-                <button class="add-to-cart" data-id="${product.id}">
-                    <i class="fas fa-cart-plus"></i> Agregar
-                </button>
-            </div>
-        `;
-        offersContainer.appendChild(productCard);
-    });
+                <div class="product-info">
+                    <h4 class="product-title">${product.name}</h4>
+                    <div class="product-rating">
+                        ${generateRatingStars(product.rating)}
+                        <span style="color: var(--gray-color); font-size: 0.9rem;">${product.rating}</span>
+                    </div>
+                    <div class="product-price">
+                        <span style="color: var(--primary-color); font-size: 1.3rem; font-weight: 700;">$${product.price.toFixed(2)}</span>
+                        <span style="color: var(--gray-color); text-decoration: line-through; margin-left: 5px; font-size: 1rem;">$${product.originalPrice.toFixed(2)}</span>
+                    </div>
+                    <button class="add-to-cart" data-id="${product.id}">
+                        <i class="fas fa-cart-plus"></i> Agregar
+                    </button>
+                </div>
+            `;
+            offersContainer.appendChild(productCard);
+        });
+
+        setTimeout(hideLoader, 120);
+    }, 120);
 }
 
 // Renderizar detalle de producto según el id en la URL
@@ -666,7 +813,6 @@ function renderProductDetail() {
 
     container.innerHTML = `
         <div class="product-detail-card">
-            <a href="products.php" class="back-link">← Volver a productos</a>
             <div class="detail-grid">
                 <div class="detail-image">
                     <img src="${product.image}" alt="${product.name}">
@@ -694,4 +840,79 @@ function renderProductDetail() {
             showNotification(`${product.name} agregado al carrito`);
         });
     }
+
+    // Safety: force layout styles in case CSS is being overridden in the environment
+    const grid = container.querySelector('.detail-grid');
+    const imgWrap = container.querySelector('.detail-image');
+    const info = container.querySelector('.detail-info');
+    const imgEl = container.querySelector('.detail-image img');
+
+    if (grid) {
+        grid.style.display = 'flex';
+        grid.style.gap = '24px';
+        grid.style.alignItems = 'flex-start';
+    }
+
+    if (imgWrap) {
+        imgWrap.style.flex = '0 0 45%';
+        imgWrap.style.maxWidth = '45%';
+    }
+
+    if (info) {
+        info.style.flex = '1 1 55%';
+    }
+
+    if (imgEl) {
+        imgEl.style.width = '100%';
+        imgEl.style.height = '100%';
+        imgEl.style.objectFit = 'cover';
+        imgEl.style.display = 'block';
+        imgEl.style.maxHeight = '420px';
+    }
+
+    // Ensure the .detail-info column matches the rendered image height so content can be centered
+    const infoCol = container.querySelector('.detail-info');
+    if (imgEl && infoCol) {
+        const applyHeight = () => {
+            // offsetHeight includes padding/border; use that to match visual height
+            const h = imgEl.offsetHeight;
+            if (h && h > 0) {
+                infoCol.style.minHeight = h + 'px';
+                // make sure vertical centering applies
+                infoCol.style.display = 'flex';
+                infoCol.style.flexDirection = 'column';
+                infoCol.style.justifyContent = 'center';
+            }
+        };
+
+        if (imgEl.complete) {
+            // image already loaded
+            applyHeight();
+        } else {
+            imgEl.addEventListener('load', applyHeight);
+            // also guard against slow layout changes
+            setTimeout(applyHeight, 300);
+        }
+    }
+}
+
+// Loader helpers (subtle spinner when switching categories)
+function ensureLoaderExists() {
+    if (document.getElementById('global-loader')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'global-loader';
+    overlay.className = 'loader-overlay';
+    overlay.innerHTML = '<div class="loader" aria-hidden="true"></div>';
+    document.body.appendChild(overlay);
+}
+
+function showLoader() {
+    ensureLoaderExists();
+    const el = document.getElementById('global-loader');
+    if (el) el.classList.add('active');
+}
+
+function hideLoader() {
+    const el = document.getElementById('global-loader');
+    if (el) el.classList.remove('active');
 }

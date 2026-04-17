@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <!-- Header simplificado -->
+    <!-- Header (unificado con index.php) -->
     <header>
         <div class="container">
             <div class="header-top">
@@ -22,9 +22,32 @@
                         <h1>RapiMarket</h1>
                     </a>
                 </div>
-                <div class="header-actions">
-                    <a href="register.php" class="btn btn-outline">Volver</a>
+
+                <div class="search-bar">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Buscar productos...">
                 </div>
+
+                <div class="header-actions">
+                    <div id="auth-buttons"></div>
+                    <div class="cart-icon" id="open-cart">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span class="cart-count">0</span>
+                    </div>
+                    <div class="hamburger">
+                        <i class="fas fa-bars"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="header-bottom">
+                <ul class="categories">
+                    <li><a href="products.php" class="active">Todos</a></li>
+                    <li><a href="products.php?category=supermercado">Supermercado</a></li>
+                    <li><a href="products.php?category=bebidas">Bebidas</a></li>
+                    <li><a href="products.php?category=lacteos">Lácteos</a></li>
+                    <li><a href="products.php?category=snacks">Snacks</a></li>
+                </ul>
             </div>
         </div>
     </header>
@@ -116,6 +139,25 @@
             </div>
         </div>
     </section>
+
+    <!-- Carrito de compras (shared) -->
+    <div class="overlay" id="overlay"></div>
+    <div class="cart-sidebar" id="cart-sidebar">
+        <div class="cart-header">
+            <h3>Tu Carrito</h3>
+            <button class="close-cart" id="close-cart">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="cart-items" id="cart-items"></div>
+        <div class="cart-footer">
+            <div class="cart-total">
+                <span>Total:</span>
+                <span id="cart-total">$0.00</span>
+            </div>
+            <button class="checkout-btn">Continuar compra</button>
+        </div>
+    </div>
 
     <!-- Footer -->
     <footer>

@@ -46,12 +46,10 @@
                 <ul class="categories">
                     <li><a href="products.php" class="active">Todos</a></li>
                     <li><a href="products.php?category=supermercado">Supermercado</a></li>
-                    <li><a href="products.php?category=farmacia">Farmacia</a></li>
                     <li><a href="products.php?category=bebidas">Bebidas</a></li>
-                    <li><a href="products.php?category=lácteos">Lácteos</a></li>
+                    <li><a href="products.php?category=lacteos">Lácteos</a></li>
                     <li><a href="products.php?category=snacks">Snacks</a></li>
-                    <li><a href="products.php?category=limpieza">Limpieza</a></li>
-                    <li><a href="products.php?category=mascotas">Mascotas</a></li>
+                    
                 </ul>
             </div>
         </div>

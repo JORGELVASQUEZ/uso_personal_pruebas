@@ -748,6 +748,40 @@ footer {
     transform: translateX(0);
 }
 
+/* Subtle global loader shown when filtering products/offers */
+.loader-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.6);
+    z-index: 2500;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease-in-out;
+}
+.loader-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+.loader {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 4px solid rgba(0,0,0,0.08);
+    border-top-color: var(--primary-color);
+    animation: spin 1s linear infinite;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+
 /* Responsive */
 @media (max-width: 992px) {
     .banner-content {
@@ -799,6 +833,147 @@ footer {
         font-size: 1.6rem;
     }
     
+
+/* Product detail layout */
+.product-detail-card {
+    background-color: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    padding: 24px;
+    margin: 30px 0;
+}
+.detail-grid {
+    display: flex;
+    gap: 24px;
+    /* make both columns equal height so text aligns to image height */
+    align-items: stretch;
+}
+.detail-image {
+    flex: 0 0 45%;
+    max-width: 45%;
+}
+.detail-image img {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    object-fit: cover;
+}
+.detail-info {
+    flex: 1 1 55%;
+    /* layout content vertically so we can center or space items relative to image height */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* keep the action (button) anchored near the bottom when there's space */
+.detail-actions {
+    margin-top: 18px;
+}
+.detail-actions .btn {
+    margin-top: auto;
+}
+.product-detail-card .detail-grid {
+    /* refuerzo para evitar que otras reglas sobrescriban el layout */
+    display: flex !important;
+    gap: 24px !important;
+    align-items: flex-start !important;
+}
+.product-detail-card .detail-image {
+    flex: 0 0 45% !important;
+    max-width: 45% !important;
+}
+.product-detail-card .detail-info {
+    flex: 1 1 55% !important;
+}
+.product-detail-card .detail-image img {
+    width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    border-radius: 8px !important;
+    object-fit: cover !important;
+}
+
+/* Normalize product grid images so all thumbnails have the same size */
+.products-grid .product-card .product-image {
+    height: 220px;
+    overflow: hidden;
+}
+.products-grid .product-card .product-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Offers use the same thumbnail sizing */
+.offers-container .product-card .product-image,
+.products-section .product-card .product-image {
+    height: 220px;
+    overflow: hidden;
+}
+
+/* Ensure product cards align content at the top so titles don't shift */
+.product-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+/* Constrain detail card width and ensure image/info sit side-by-side on desktop */
+.product-detail-card {
+    max-width: 1000px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.product-detail-card .detail-image {
+    max-width: 420px;
+}
+.product-detail-card .detail-image img {
+    max-height: 420px;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+@media (max-width: 992px) {
+    .products-grid .product-card .product-image {
+        height: 180px;
+    }
+    .product-detail-card .detail-image {
+        max-width: 100%;
+        flex: 0 0 auto;
+    }
+}
+.detail-title {
+    font-size: 1.8rem;
+    margin-bottom: 8px;
+}
+.detail-description {
+    color: var(--gray-color);
+    margin: 14px 0 18px;
+    line-height: 1.5;
+}
+.detail-rating {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #FFC107;
+    margin-bottom: 10px;
+}
+.detail-actions .btn {
+    padding: 12px 18px;
+}
+
+@media (max-width: 768px) {
+    .detail-grid {
+        flex-direction: column;
+    }
+    .detail-image {
+        max-width: 100%;
+        flex: 0 0 auto;
+    }
+}
     .auth-card {
         padding: 30px 20px;
     }

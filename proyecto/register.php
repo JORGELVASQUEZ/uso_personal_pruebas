@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <!-- Header simplificado -->
+    <!-- Header simplificado: solo logo -->
     <header>
         <div class="container">
             <div class="header-top">
@@ -21,9 +21,6 @@
                         <i class="fas fa-bolt logo-icon"></i>
                         <h1>RapiMarket</h1>
                     </a>
-                </div>
-                <div class="header-actions">
-                    <a href="index.php" class="btn btn-outline">Volver al inicio</a>
                 </div>
             </div>
         </div>

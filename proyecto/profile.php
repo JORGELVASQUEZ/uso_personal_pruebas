@@ -265,6 +265,7 @@ try {
     </style>
 </head>
 <body>
+    <!-- Header (unificado con index.php) -->
     <header>
         <div class="container">
             <div class="header-top">
@@ -274,7 +275,32 @@ try {
                         <h1>RapiMarket</h1>
                     </a>
                 </div>
-                <div class="header-actions" id="auth-buttons"></div>
+
+                <div class="search-bar">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Buscar productos...">
+                </div>
+
+                <div class="header-actions">
+                    <div id="auth-buttons"></div>
+                    <div class="cart-icon" id="open-cart">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span class="cart-count">0</span>
+                    </div>
+                    <div class="hamburger">
+                        <i class="fas fa-bars"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="header-bottom">
+                <ul class="categories">
+                    <li><a href="products.php" class="active">Todos</a></li>
+                    <li><a href="products.php?category=supermercado">Supermercado</a></li>
+                    <li><a href="products.php?category=bebidas">Bebidas</a></li>
+                    <li><a href="products.php?category=lacteos">Lácteos</a></li>
+                    <li><a href="products.php?category=snacks">Snacks</a></li>
+                </ul>
             </div>
         </div>
     </header>
