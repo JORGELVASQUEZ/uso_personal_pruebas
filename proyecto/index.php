@@ -9,7 +9,7 @@
     <title>RapiMarket - Tu Supermercado Online</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=1.1">
 </head>
 <body>
     <!-- Header -->
@@ -168,7 +168,7 @@
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>&copy; 2023 RapiMarket. Todos los derechos reservados.</p>
+                <p>&copy; 2026 RapiMarket. Todos los derechos reservados.</p>
             </div>
         </div>
     </footer>

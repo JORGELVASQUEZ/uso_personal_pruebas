@@ -460,10 +460,11 @@ async function logout() {
     showNotification('Sesión cerrada correctamente');
 }
 
-// Inicializar la aplicación
+// Inicializar la aplicación                                
 document.addEventListener('DOMContentLoaded', async () => {
     await initData();
     initCart();
+    initSearch(); // <-- Agrega esta línea
     updateUserUI();
     
     // Agregar evento al botón de checkout si existe
@@ -976,6 +977,247 @@ function renderProductDetail() {
         }
     }
 }
+
+
+
+
+// Función para buscar productos
+/**
+ * Busca productos por nombre en productos y ofertas
+ * @param {string} searchTerm Término de búsqueda
+ */
+function searchProducts(searchTerm) {
+    if (!searchTerm || searchTerm.trim() === '') {
+        // Si el término está vacío, mostrar todos los productos
+        loadProducts();
+        loadOffers();
+        return;
+    }
+
+    const term = searchTerm.toLowerCase().trim();
+    
+    // Filtrar productos normales
+    const filteredProducts = products.filter(product => 
+        product.name.toLowerCase().includes(term) ||
+        product.category.toLowerCase().includes(term) ||
+        (product.description && product.description.toLowerCase().includes(term))
+    );
+    
+    // Filtrar ofertas
+    const filteredOffers = offers.filter(offer => 
+        offer.name.toLowerCase().includes(term) ||
+        offer.category.toLowerCase().includes(term) ||
+        (offer.description && offer.description.toLowerCase().includes(term))
+    );
+    
+    // Mostrar resultados
+    displaySearchResults(filteredProducts, filteredOffers, term);
+}
+
+// Mostrar resultados de búsqueda
+/**
+ * Muestra los resultados de búsqueda en la interfaz
+ * @param {Array} productsResult Productos encontrados
+ * @param {Array} offersResult Ofertas encontradas
+ * @param {string} searchTerm Término buscado
+ */
+function displaySearchResults(productsResult, offersResult, searchTerm) {
+    const productsContainer = document.getElementById('products-container');
+    const offersContainer = document.getElementById('offers-container');
+    const sectionTitles = document.querySelectorAll('.section-title');
+    
+    if (!productsContainer) return;
+    
+    // Mostrar loader
+    showLoader();
+    
+    setTimeout(() => {
+        // Limpiar contenedores
+        productsContainer.innerHTML = '';
+        if (offersContainer) offersContainer.innerHTML = '';
+        
+        const totalResults = productsResult.length + offersResult.length;
+        
+        if (totalResults === 0) {
+            // Mostrar mensaje de no resultados
+            productsContainer.innerHTML = `
+                <div style="grid-column: 1/-1; text-align: center; padding: 40px;">
+                    <i class="fas fa-search" style="font-size: 48px; color: var(--gray-color); margin-bottom: 20px;"></i>
+                    <h3>No se encontraron productos para "${searchTerm}"</h3>
+                    <p>Intenta con otros términos o revisa nuestra tienda</p>
+                    <button onclick="clearSearch()" class="btn" style="margin-top: 20px;">Ver todos los productos</button>
+                </div>
+            `;
+            if (offersContainer) offersContainer.style.display = 'none';
+            if (sectionTitles.length) sectionTitles.forEach(title => title.style.display = 'none');
+            hideLoader();
+            return;
+        }
+        
+        // Mostrar resultados de productos
+        if (productsResult.length > 0) {
+            if (sectionTitles.length && sectionTitles[0]) sectionTitles[0].style.display = 'flex';
+            productsResult.forEach(product => {
+                const productCard = createProductCard(product, false);
+                productsContainer.appendChild(productCard);
+            });
+        } else {
+            if (sectionTitles.length && sectionTitles[0]) sectionTitles[0].style.display = 'none';
+        }
+        
+        // Mostrar resultados de ofertas
+        if (offersContainer && offersResult.length > 0) {
+            offersContainer.style.display = 'grid';
+            if (sectionTitles.length && sectionTitles[1]) sectionTitles[1].style.display = 'flex';
+            offersResult.forEach(offer => {
+                const offerCard = createProductCard(offer, true);
+                offersContainer.appendChild(offerCard);
+            });
+        } else if (offersContainer) {
+            offersContainer.style.display = 'none';
+            if (sectionTitles.length && sectionTitles[1]) sectionTitles[1].style.display = 'none';
+        }
+        
+        hideLoader();
+    }, 120);
+}
+
+// Crear tarjeta de producto reutilizable
+/**
+ * Crea una tarjeta de producto para mostrar en la interfaz
+ * @param {Object} product Datos del producto
+ * @param {boolean} isOffer Indica si es una oferta
+ * @returns {HTMLElement} Elemento de la tarjeta
+ */
+function createProductCard(product, isOffer = false) {
+    const productCard = document.createElement('a');
+    productCard.className = 'product-card';
+    productCard.href = `product-detail.php?id=${product.id}`;
+    
+    let priceHtml = '';
+    if (isOffer && product.originalPrice) {
+        const discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
+        priceHtml = `
+            <div class="product-price">
+                <span style="color: var(--primary-color); font-size: 1.3rem; font-weight: 700;">$${product.price.toFixed(2)}</span>
+                <span style="color: var(--gray-color); text-decoration: line-through; margin-left: 5px; font-size: 1rem;">$${product.originalPrice.toFixed(2)}</span>
+            </div>
+        `;
+        productCard.innerHTML = `
+            <div style="position: absolute; top: 10px; left: 10px; background-color: var(--primary-color); color: white; padding: 5px 10px; border-radius: 4px; font-weight: bold; z-index: 1;">
+                -${discount}%
+            </div>
+            <div class="product-image">
+                <img src="${product.image}" alt="${product.name}">
+            </div>
+            <div class="product-info">
+                <h4 class="product-title">${product.name}</h4>
+                <div class="product-rating">
+                    ${generateRatingStars(product.rating)}
+                    <span style="color: var(--gray-color); font-size: 0.9rem;">${product.rating}</span>
+                </div>
+                ${priceHtml}
+                <button class="add-to-cart" data-id="${product.id}">
+                    <i class="fas fa-cart-plus"></i> Agregar
+                </button>
+            </div>
+        `;
+    } else {
+        priceHtml = `<div class="product-price">$${product.price.toFixed(2)}</div>`;
+        productCard.innerHTML = `
+            <div class="product-image">
+                <img src="${product.image}" alt="${product.name}">
+            </div>
+            <div class="product-info">
+                <h4 class="product-title">${product.name}</h4>
+                <div class="product-rating">
+                    ${generateRatingStars(product.rating)}
+                    <span style="color: var(--gray-color); font-size: 0.9rem;">${product.rating}</span>
+                </div>
+                ${priceHtml}
+                <button class="add-to-cart" data-id="${product.id}">
+                    <i class="fas fa-cart-plus"></i> Agregar
+                </button>
+            </div>
+        `;
+    }
+    
+    // Agregar evento al botón
+    const addButton = productCard.querySelector('.add-to-cart');
+    addButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const productId = parseInt(e.currentTarget.dataset.id);
+        addToCart(productId);
+    });
+    
+    return productCard;
+}
+
+// Limpiar búsqueda y mostrar todos los productos
+/**
+ * Limpia la búsqueda y restablece la vista normal de productos
+ */
+function clearSearch() {
+    const searchInput = document.querySelector('.search-bar input');
+    if (searchInput) {
+        searchInput.value = '';
+    }
+    loadProducts();
+    loadOffers();
+    
+    // Restablecer visibilidad de secciones
+    const offersContainer = document.getElementById('offers-container');
+    const sectionTitles = document.querySelectorAll('.section-title');
+    if (offersContainer) offersContainer.style.display = 'grid';
+    if (sectionTitles.length) {
+        sectionTitles.forEach(title => title.style.display = 'flex');
+    }
+    
+    showNotification('Mostrando todos los productos');
+}
+
+// Inicializar buscador
+/**
+ * Configura el evento de búsqueda en el input
+ */
+function initSearch() {
+    const searchInput = document.querySelector('.search-bar input');
+    const searchIcon = document.querySelector('.search-bar i');
+    
+    if (!searchInput) return;
+    
+    // Buscar al escribir (con debounce para mejor rendimiento)
+    let searchTimeout;
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            const searchTerm = e.target.value;
+            searchProducts(searchTerm);
+        }, 300); // Esperar 300ms después de que el usuario deje de escribir
+    });
+    
+    // Buscar al hacer clic en el ícono de búsqueda
+    if (searchIcon) {
+        searchIcon.addEventListener('click', () => {
+            const searchTerm = searchInput.value;
+            searchProducts(searchTerm);
+        });
+    }
+    
+    // Buscar al presionar Enter
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const searchTerm = searchInput.value;
+            searchProducts(searchTerm);
+        }
+    });
+}
+
+
+
+
 
 // Loader helpers (subtle spinner when switching categories)
 function ensureLoaderExists() {

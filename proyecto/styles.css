@@ -1,8 +1,8 @@
 :root {
-    --primary-color: #FF6B00;
-    --primary-dark: #E55A00;
+    --primary-color: hsl(203, 100%, 50%);
+    --primary-dark:hsl(203, 100%, 50%);
     --secondary-color: #2E8B57;
-    --dark-color: #333333;
+    --dark-color: hsl(192, 88%, 43%);
     --light-color: #F8F9FA;
     --gray-color: #6C757D;
     --light-gray: #E9ECEF;
@@ -184,7 +184,7 @@ header {
 
 /* Banner */
 .banner {
-    background: linear-gradient(to right, #FF6B00, #FF8E42);
+    background: hsl(203, 100%, 50%);
     color: white;
     padding: 40px 0;
     margin-bottom: 30px;
@@ -661,7 +661,7 @@ header {
 /* Footer */
 footer {
     background-color: var(--dark-color);
-    color: white;
+    color: black;
     padding: 50px 0 20px;
     margin-top: auto;
 }
@@ -674,7 +674,7 @@ footer {
 }
 
 .footer-column h4 {
-    color: white;
+    color:black;
     margin-bottom: 20px;
     font-size: 1.2rem;
 }
@@ -688,13 +688,13 @@ footer {
 }
 
 .footer-column a {
-    color: #bbb;
+    color:black;
     text-decoration: none;
     transition: var(--transition);
 }
 
 .footer-column a:hover {
-    color: white;
+    color: black;
 }
 
 .social-icons {
@@ -724,7 +724,7 @@ footer {
     text-align: center;
     padding-top: 20px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-    color: #bbb;
+    color: hsl(0, 100%, 0%);
     font-size: 0.9rem;
 }
 

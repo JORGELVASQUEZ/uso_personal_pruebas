@@ -126,7 +126,7 @@
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>&copy; 2023 RapiMarket. Todos los derechos reservados.</p>
+                <p>&copy; 2026 RapiMarket. Todos los derechos reservados.</p>
             </div>
         </div>
     </footer>
