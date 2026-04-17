@@ -533,13 +533,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const newPath = categoryParam ? `products.php?category=${encodeURIComponent(categoryParam)}` : 'products.php';
             history.pushState({ category: categoryParam }, '', newPath);
 
-                // Recargar la lista filtrada (productos y ofertas)
-                loadProducts(categoryParam);
-                loadOffers(categoryParam);
+                // Recargar la lista filtrada (productos y ofertas) en un único contenedor sin duplicados
+                loadCombined(categoryParam);
 
-            // Mostrar notificación de filtro aplicado
-            const category = link.textContent;
-            showNotification(`Filtrado por: ${category}`);
+            // No mostrar notificación al aplicar filtro (mostramos productos y ofertas juntos)
         });
     });
     
@@ -581,8 +578,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        loadProducts(initialCategory);
-        loadOffers(initialCategory);
+    loadCombined(initialCategory);
     }
 
     // Handle back/forward navigation to update category filter
@@ -603,8 +599,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        loadProducts(cat);
-        loadOffers(cat);
+    loadCombined(cat);
     });
 
     // Cargar detalle de producto si estamos en la página de detalle
@@ -649,12 +644,7 @@ function loadProducts(category = null) {
             return cat === selected;
         });
 
-        if (selected && filtered.length === 0) {
-            productsContainer.innerHTML = `<p>No se encontraron productos para la categoría seleccionada.</p>`;
-            hideLoader();
-            return;
-        }
-
+        // Renderizar productos filtrados
         filtered.forEach(product => {
             const productCard = document.createElement('a');
             productCard.className = 'product-card';
@@ -686,6 +676,58 @@ function loadProducts(category = null) {
             });
             
             productsContainer.appendChild(productCard);
+        });
+
+        // Además mostramos las ofertas que coincidan con la misma categoría
+        const offersFiltered = offers.filter(p => {
+            if (!selected) return true;
+            const cat = normalize(p.category);
+            if (selected === 'supermercado') {
+                return supermercadoGroup.has(cat) || cat === selected;
+            }
+            return cat === selected;
+        });
+
+        offersFiltered.forEach(offer => {
+            const discount = Math.round(((offer.originalPrice - offer.price) / offer.originalPrice) * 100);
+
+            const offerCard = document.createElement('a');
+            offerCard.className = 'product-card';
+            offerCard.href = `product-detail.php?id=${offer.id}`;
+            offerCard.innerHTML = `
+                <div style="position: absolute; top: 10px; left: 10px; background-color: var(--primary-color); color: white; padding: 5px 10px; border-radius: 4px; font-weight: bold; z-index: 1;">
+                    -${discount}%
+                </div>
+                <div class="product-image">
+                    <img src="${offer.image}" alt="${offer.name}">
+                </div>
+                <div class="product-info">
+                    <h4 class="product-title">${offer.name}</h4>
+                    <div class="product-rating">
+                        ${generateRatingStars(offer.rating)}
+                        <span style="color: var(--gray-color); font-size: 0.9rem;">${offer.rating}</span>
+                    </div>
+                    <div class="product-price">
+                        <span style="color: var(--primary-color); font-size: 1.3rem; font-weight: 700;">$${offer.price.toFixed(2)}</span>
+                        <span style="color: var(--gray-color); text-decoration: line-through; margin-left: 5px; font-size: 1rem;">$${offer.originalPrice.toFixed(2)}</span>
+                    </div>
+                    <button class="add-to-cart" data-id="${offer.id}">
+                        <i class="fas fa-cart-plus"></i> Agregar
+                    </button>
+                </div>
+            `;
+
+            const addOfferButton = offerCard.querySelector('.add-to-cart');
+            if (addOfferButton) {
+                addOfferButton.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const productId = parseInt(e.currentTarget.dataset.id);
+                    addToCart(productId);
+                });
+            }
+
+            productsContainer.appendChild(offerCard);
         });
 
         setTimeout(hideLoader, 120);
@@ -766,6 +808,84 @@ function loadOffers(category = null) {
             });
             
             offersContainer.appendChild(productCard);
+        });
+
+        setTimeout(hideLoader, 120);
+    }, 120);
+}
+
+// Cargar productos y ofertas juntos sin duplicados
+/**
+ * Renderiza en `#products-container` los productos y ofertas que coincidan con la categoría
+ * evitando duplicados por `id`.
+ */
+function loadCombined(category = null) {
+    const productsContainer = document.getElementById('products-container');
+    const offersContainer = document.getElementById('offers-container');
+    if (!productsContainer) return;
+
+    const normalize = (s) => {
+        if (!s) return '';
+        try {
+            return String(s).toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
+        } catch (e) {
+            return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        }
+    };
+
+    const selected = category ? normalize(category) : null;
+    const supermercadoGroup = new Set(['supermercado', 'huevos', 'granos', 'aceites', 'pastas', 'verduras', 'farmacia', 'farmacias']);
+
+    showLoader();
+
+    setTimeout(() => {
+        productsContainer.innerHTML = '';
+        if (offersContainer) offersContainer.style.display = 'none';
+
+        // Filtrar productos y ofertas por categoría
+        const filteredProducts = products.filter(p => {
+            if (!selected) return true;
+            const cat = normalize(p.category);
+            if (selected === 'supermercado') return supermercadoGroup.has(cat) || cat === selected;
+            return cat === selected;
+        });
+
+        const filteredOffers = offers.filter(p => {
+            if (!selected) return true;
+            const cat = normalize(p.category);
+            if (selected === 'supermercado') return supermercadoGroup.has(cat) || cat === selected;
+            return cat === selected;
+        });
+
+        // Unir manteniendo productos primero y evitando duplicados por id
+        const seen = new Set();
+        const combined = [];
+
+        filteredProducts.forEach(p => {
+            if (!seen.has(p.id)) {
+                seen.add(p.id);
+                combined.push({ item: p, isOffer: false });
+            }
+        });
+
+        filteredOffers.forEach(o => {
+            if (!seen.has(o.id)) {
+                seen.add(o.id);
+                combined.push({ item: o, isOffer: true });
+            }
+        });
+
+        // Si no hay resultados en ninguno de los dos, mostrar mensaje
+        if (combined.length === 0) {
+            productsContainer.innerHTML = `<p>No se encontraron productos ni ofertas para la categoría seleccionada.</p>`;
+            hideLoader();
+            return;
+        }
+
+        // Renderizar elementos combinados
+        combined.forEach(entry => {
+            const card = createProductCard(entry.item, entry.isOffer);
+            productsContainer.appendChild(card);
         });
 
         setTimeout(hideLoader, 120);
@@ -988,9 +1108,8 @@ function renderProductDetail() {
  */
 function searchProducts(searchTerm) {
     if (!searchTerm || searchTerm.trim() === '') {
-        // Si el término está vacío, mostrar todos los productos
-        loadProducts();
-        loadOffers();
+        // Si el término está vacío, mostrar todos los productos y ofertas juntos sin duplicados
+        loadCombined();
         return;
     }
 
@@ -1163,8 +1282,7 @@ function clearSearch() {
     if (searchInput) {
         searchInput.value = '';
     }
-    loadProducts();
-    loadOffers();
+    loadCombined();
     
     // Restablecer visibilidad de secciones
     const offersContainer = document.getElementById('offers-container');
