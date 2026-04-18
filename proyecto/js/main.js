@@ -49,6 +49,16 @@ function appendFormValue(params, key, value) {
 }
 
 /**
+ * Valida que un teléfono contenga exactamente 10 dígitos (ignorando otros caracteres).
+ * @param {string} phone Texto del teléfono.
+ * @returns {boolean} True si tiene 10 dígitos.
+ */
+function isValidTenDigits(phone) {
+    const digits = String(phone).replace(/\D/g, '');
+    return digits.length === 10;
+}
+
+/**
  * Hace una petición a la API interna (`api.php?action=...`) y devuelve la respuesta JSON.
  * @param {string} action Acción a solicitar en la API.
  * @param {object|null} body Cuerpo a enviar (se serializa como application/x-www-form-urlencoded).
@@ -1357,3 +1367,29 @@ function hideLoader() {
     const el = document.getElementById('global-loader');
     if (el) el.classList.remove('active');
 }
+
+// Preselect country-code based on browser locale (no flag icons)
+document.addEventListener('DOMContentLoaded', () => {
+    const countrySelect = document.getElementById('country-code');
+    if (!countrySelect) return;
+
+    const lang = (navigator.language || navigator.userLanguage || '').toLowerCase();
+    const localeMap = {
+        'es-pe': '+51', 'es-mx': '+52', 'es-es': '+34', 'en-us': '+1', 'en-gb': '+44',
+        'es-co': '+57', 'es-ar': '+54', 'es-cl': '+56', 'es-ve': '+58', 'hi-in': '+91',
+        'fr-fr': '+33', 'de-de': '+49'
+    };
+
+    let selected = null;
+    Object.keys(localeMap).forEach(k => { if (lang.startsWith(k)) selected = localeMap[k]; });
+
+    if (!selected) {
+        const base = lang.split('-')[0];
+        const baseMap = { 'es': '+51', 'en': '+1', 'fr': '+33', 'de': '+49', 'hi': '+91' };
+        if (baseMap[base]) selected = baseMap[base];
+    }
+
+    if (selected && [...countrySelect.options].some(o => o.value === selected)) {
+        countrySelect.value = selected;
+    }
+});

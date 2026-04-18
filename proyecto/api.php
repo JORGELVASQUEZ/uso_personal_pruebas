@@ -130,6 +130,23 @@ function bootstrapSchema(PDO $pdo): void
             CONSTRAINT fk_cart_items_cart FOREIGN KEY (cart_id) REFERENCES carts(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
     );
+
+    // Tabla para vendedores
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS vendedor (
+            numero_telefono BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+            nombres VARCHAR(100) NOT NULL,
+            apellidos VARCHAR(100) NOT NULL,
+            `correo_electronico` VARCHAR(255) NOT NULL UNIQUE,
+            `contrasena` VARCHAR(64) NOT NULL,
+            store_name VARCHAR(255) NULL,
+            store_address VARCHAR(255) NULL,
+            store_hours VARCHAR(255) NULL,
+            store_type VARCHAR(100) NULL,
+            tax_id VARCHAR(100) NULL,
+            status VARCHAR(32) DEFAULT 'pending'
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+    );
 }
 
 /**
@@ -137,11 +154,31 @@ function bootstrapSchema(PDO $pdo): void
  * @param array $row Fila de la tabla comprador.
  * @return array Datos de usuario normalizados.
  */
-function mapUser(array $row): array
+/**
+ * Mapea una fila de usuario (comprador o vendedor) a la estructura usada por la API.
+ * El argumento $role puede ser 'buyer' o 'seller' para mapear campos específicos.
+ */
+function mapUser(array $row, string $role = 'buyer'): array
 {
     $nombres = isset($row['nombres']) ? trim((string) $row['nombres']) : '';
     $apellidos = isset($row['apellidos']) ? trim((string) $row['apellidos']) : '';
     $fullName = trim($nombres . ' ' . $apellidos);
+
+    if ($role === 'seller') {
+        return [
+            'id' => isset($row['numero_telefono']) ? (int) $row['numero_telefono'] : 0,
+            'name' => $fullName !== '' ? $fullName : 'Vendedor',
+            'email' => $row['correo_electronico'] ?? '',
+            'phone' => isset($row['numero_telefono']) ? (string) $row['numero_telefono'] : '',
+            'address' => $row['store_address'] ?? '',
+            'role' => 'seller',
+            'storeName' => $row['store_name'] ?? null,
+            'storeType' => $row['store_type'] ?? null,
+            'taxId' => $row['tax_id'] ?? null,
+            'storeHours' => $row['store_hours'] ?? null,
+            'status' => $row['status'] ?? 'pending',
+        ];
+    }
 
     return [
         'id' => isset($row['numero_telefono']) ? (int) $row['numero_telefono'] : 0,
@@ -164,6 +201,18 @@ function mapUser(array $row): array
  */
 function currentUser(PDO $pdo): ?array
 {
+    // Prefer seller session if present
+    $sellerPhone = isset($_SESSION['vendedor_phone']) ? (int) $_SESSION['vendedor_phone'] : 0;
+    if ($sellerPhone > 0) {
+        $stmt = $pdo->prepare('SELECT * FROM vendedor WHERE numero_telefono = :numero_telefono LIMIT 1');
+        $stmt->execute(['numero_telefono' => $sellerPhone]);
+        $seller = $stmt->fetch();
+        if ($seller) {
+            return mapUser($seller, 'seller');
+        }
+        unset($_SESSION['vendedor_phone']);
+    }
+
     $buyerPhone = isset($_SESSION['comprador_phone']) ? (int) $_SESSION['comprador_phone'] : 0;
     if ($buyerPhone <= 0) {
         return null;
@@ -178,7 +227,7 @@ function currentUser(PDO $pdo): ?array
         return null;
     }
 
-    return mapUser($user);
+    return mapUser($user, 'buyer');
 }
 
 /**
@@ -418,26 +467,45 @@ try {
             jsonResponse(['success' => false, 'message' => 'Completa email y contraseña'], 422);
         }
 
+        // Try buyer first
         $stmt = $pdo->prepare('SELECT * FROM comprador WHERE `correo_electrónico` = :email LIMIT 1');
         $stmt->execute(['email' => $email]);
         $row = $stmt->fetch();
 
-        if (!$row || !isset($row['contraseña']) || (string) $row['contraseña'] !== $password) {
-            jsonResponse(['success' => false, 'message' => 'Email o contraseña incorrectos'], 401);
+        if ($row && isset($row['contraseña']) && (string) $row['contraseña'] === $password) {
+            $userId = (int) $row['numero_telefono'];
+            $_SESSION['comprador_phone'] = $userId;
+            mergeSessionCartIntoUser($pdo, $userId, session_id());
+            $cart = loadCart($pdo, $userId, session_id());
+
+            jsonResponse([
+                'success' => true,
+                'message' => 'Login exitoso',
+                'user' => mapUser($row, 'buyer'),
+                'cart' => $cart,
+            ]);
         }
 
-        $userId = (int) $row['numero_telefono'];
-        $_SESSION['comprador_phone'] = $userId;
+        // Try seller
+        $stmt2 = $pdo->prepare('SELECT * FROM vendedor WHERE `correo_electronico` = :email LIMIT 1');
+        $stmt2->execute(['email' => $email]);
+        $sellerRow = $stmt2->fetch();
 
-        mergeSessionCartIntoUser($pdo, $userId, session_id());
-        $cart = loadCart($pdo, $userId, session_id());
+        if ($sellerRow && isset($sellerRow['contrasena']) && (string) $sellerRow['contrasena'] === $password) {
+            $userId = (int) $sellerRow['numero_telefono'];
+            $_SESSION['vendedor_phone'] = $userId;
+            mergeSessionCartIntoUser($pdo, $userId, session_id());
+            $cart = loadCart($pdo, $userId, session_id());
 
-        jsonResponse([
-            'success' => true,
-            'message' => 'Login exitoso',
-            'user' => mapUser($row),
-            'cart' => $cart,
-        ]);
+            jsonResponse([
+                'success' => true,
+                'message' => 'Login exitoso',
+                'user' => mapUser($sellerRow, 'seller'),
+                'cart' => $cart,
+            ]);
+        }
+
+        jsonResponse(['success' => false, 'message' => 'Email o contraseña incorrectos'], 401);
     }
 
     if ($action === 'register' && $method === 'POST') {
@@ -448,6 +516,7 @@ try {
         $password = isset($body['password']) ? (string) $body['password'] : '';
         $phoneRaw = isset($body['phone']) ? (string) $body['phone'] : '';
         $address = isset($body['address']) ? trim((string) $body['address']) : '';
+        $role = isset($body['role']) ? trim((string)$body['role']) : 'buyer';
 
         if ($name === '' || $email === '' || $password === '' || $phoneRaw === '' || $address === '') {
             jsonResponse(['success' => false, 'message' => 'Completa los campos obligatorios'], 422);
@@ -488,6 +557,63 @@ try {
             $firstNames = trim(implode(' ', $names));
         }
 
+        // Check email/phone uniqueness across both tables depending on role
+        if ($role === 'seller') {
+            $existsStmt = $pdo->prepare('SELECT numero_telefono FROM vendedor WHERE `correo_electronico` = :email LIMIT 1');
+            $existsStmt->execute(['email' => $email]);
+            if ($existsStmt->fetch()) {
+                jsonResponse(['success' => false, 'message' => 'Este email ya está registrado'], 409);
+            }
+
+            $phoneExistsStmt = $pdo->prepare('SELECT numero_telefono FROM vendedor WHERE numero_telefono = :numero_telefono LIMIT 1');
+            $phoneExistsStmt->execute(['numero_telefono' => $phone]);
+            if ($phoneExistsStmt->fetch()) {
+                jsonResponse(['success' => false, 'message' => 'Este teléfono ya está registrado'], 409);
+            }
+
+            $storeName = isset($body['storeName']) ? trim((string)$body['storeName']) : '';
+            $storeAddress = isset($body['storeAddress']) ? trim((string)$body['storeAddress']) : '';
+            $storeType = isset($body['storeType']) ? trim((string)$body['storeType']) : '';
+            $taxId = isset($body['taxId']) ? trim((string)$body['taxId']) : '';
+
+            $insertStmt = $pdo->prepare(
+                'INSERT INTO vendedor (
+                    numero_telefono, nombres, apellidos, `correo_electronico`, `contrasena`, store_name, store_address, store_type, tax_id
+                ) VALUES (
+                    :numero_telefono, :nombres, :apellidos, :correo_electronico, :contrasena, :store_name, :store_address, :store_type, :tax_id
+                )'
+            );
+
+            $insertStmt->execute([
+                'numero_telefono' => $phone,
+                'nombres' => $firstNames,
+                'apellidos' => $lastNames,
+                'correo_electronico' => $email,
+                'contrasena' => $password,
+                'store_name' => $storeName,
+                'store_address' => $storeAddress,
+                'store_type' => $storeType,
+                'tax_id' => $taxId,
+            ]);
+
+            $userId = $phone;
+            $_SESSION['vendedor_phone'] = $userId;
+
+            $stmt = $pdo->prepare('SELECT * FROM vendedor WHERE numero_telefono = :numero_telefono LIMIT 1');
+            $stmt->execute(['numero_telefono' => $userId]);
+            $newUser = $stmt->fetch();
+
+            $cart = loadCart($pdo, $userId, session_id());
+
+            jsonResponse([
+                'success' => true,
+                'message' => 'Registro exitoso',
+                'user' => $newUser ? mapUser($newUser, 'seller') : null,
+                'cart' => $cart,
+            ], 201);
+        }
+
+        // Default: buyer registration
         $existsStmt = $pdo->prepare('SELECT numero_telefono FROM comprador WHERE `correo_electrónico` = :email LIMIT 1');
         $existsStmt->execute(['email' => $email]);
         if ($existsStmt->fetch()) {
@@ -529,7 +655,7 @@ try {
         jsonResponse([
             'success' => true,
             'message' => 'Registro exitoso',
-            'user' => $newUser ? mapUser($newUser) : null,
+            'user' => $newUser ? mapUser($newUser, 'buyer') : null,
             'cart' => $cart,
         ], 201);
     }

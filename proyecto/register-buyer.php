@@ -54,7 +54,23 @@
                 
                 <div class="form-group">
                     <label for="phone">Teléfono</label>
-                    <input type="tel" id="phone" class="form-control" placeholder="Tu número de teléfono" required>
+                    <div class="phone-row">
+                        <select id="country-code" class="form-control" aria-label="Código de país">
+                            <option value="+51">PE +51</option>
+                            <option value="+1">US +1</option>
+                            <option value="+52">MX +52</option>
+                            <option value="+34">ES +34</option>
+                            <option value="+44">GB +44</option>
+                            <option value="+57">CO +57</option>
+                            <option value="+54">AR +54</option>
+                            <option value="+56">CL +56</option>
+                            <option value="+58">VE +58</option>
+                            <option value="+91">IN +91</option>
+                            <option value="+33">FR +33</option>
+                            <option value="+49">DE +49</option>
+                        </select>
+                        <input type="tel" id="phone" name="phone" class="form-control phone-input" placeholder="Ej: 9999999999" required maxlength="10" inputmode="numeric" pattern="\d{10}" title="Ingresa 10 dígitos">
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -136,13 +152,21 @@
         document.addEventListener('DOMContentLoaded', function() {
             const registerForm = document.getElementById('register-form');
             
-            registerForm.addEventListener('submit', async function(e) {
+                registerForm.addEventListener('submit', async function(e) {
                 e.preventDefault();
                 
                 const name = document.getElementById('name').value;
                 const lastname = document.getElementById('lastname').value;
                 const email = document.getElementById('email').value;
                 const phone = document.getElementById('phone').value;
+                const countryCode = document.getElementById('country-code').value;
+
+                // Normalizar teléfono: extraer solo dígitos y validar longitud 10
+                const phoneDigits = String(phone).replace(/\D/g, '');
+                if (phoneDigits.length !== 10) {
+                    alert('El número de teléfono debe tener 10 dígitos (sin incluir el código de país)');
+                    return;
+                }
                 const address = document.getElementById('address').value;
                 const password = document.getElementById('password').value;
                 const confirmPassword = document.getElementById('confirm-password').value;
@@ -158,7 +182,8 @@
                     id: Date.now(),
                     name: `${name} ${lastname}`,
                     email: email,
-                    phone: phone,
+                    // Guardamos el teléfono incluyendo el código de país en formato +CCXXXXXXXXXX
+                    phone: `${countryCode}${phoneDigits}`,
                     address: address,
                     password: password,
                     role: 'buyer',

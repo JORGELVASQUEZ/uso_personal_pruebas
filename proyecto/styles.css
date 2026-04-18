@@ -398,6 +398,27 @@ header {
 /* Productos */
 .section-title {
     display: flex;
+
+/* Phone selector + flag styles */
+.phone-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.phone-row .form-control {
+    min-width: 0; /* allow flex shrinking */
+}
+
+.phone-row select#country-code {
+    max-width: 140px;
+    padding-left: 10px;
+}
+
+.phone-row .phone-input {
+    flex: 1 1 auto;
+}
+
     justify-content: space-between;
     align-items: center;
     margin-bottom: 25px;
