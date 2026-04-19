@@ -1,0 +1,73 @@
+/* Styles to tidy and align the product manager in profile.php */
+#product-manager { margin-top: 6px; }
+
+#pm-list .product-card { align-items:flex-start; }
+
+/* Create form layout: left inputs, right column with price + actions */
+#pm-create { margin-top:12px; border-top:1px dashed #eee; padding-top:12px; }
+#pm-create .pm-grid { display: grid; grid-template-columns: 1fr 180px; gap: 12px; align-items: start; }
+@media (max-width: 780px) { #pm-create .pm-grid { grid-template-columns: 1fr; } }
+
+#pm-create .pm-left input.form-control,
+#pm-create .pm-left textarea.form-control { margin-bottom:8px; }
+
+#pm-create .pm-right { display:flex; flex-direction:column; gap:12px; align-items:stretch; }
+#pm-create .pm-right .pm-price { width:100%; }
+#pm-create .pm-right .pm-actions { display:flex; gap:10px; justify-content:flex-start; }
+#pm-create .pm-right .pm-actions .btn { flex: 1 1 auto; }
+
+/* Style file input and preview */
+#pm-create input[type=file] { display:block; margin-bottom:6px; }
+#pm-image-preview { display:block; max-width:140px; max-height:90px; border-radius:6px; border:1px solid #eee; margin-bottom:8px; }
+
+/* Buttons smaller and consistent */
+.btn.pm-create, .btn.pm-clear { padding:10px 14px; font-size:0.95rem; }
+.btn.pm-clear { background: transparent; border: 2px solid var(--primary-color); color: var(--primary-color); }
+
+/* Product card adjustments */
+#pm-list .product-card { gap:12px; }
+#pm-list .pm-thumb { width:120px; height:80px; object-fit:cover; border-radius:6px; }
+#pm-list .pm-input { padding:8px; border-radius:6px; border:1px solid #e6e6e6; }
+
+/* Stronger, more specific styling to override global .product-card rules */
+#product-manager #pm-list .product-card {
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+    border:1px solid #eee;
+    padding:12px;
+    border-radius:8px;
+    margin-bottom:10px;
+    background: #fff;
+}
+#product-manager #pm-list .product-card .pm-thumb {
+    width:120px;
+    height:80px;
+    object-fit:cover;
+    border-radius:6px;
+    border:1px solid #f0f0f0;
+}
+#product-manager #pm-list .product-card .pm-main { flex:1; }
+#product-manager #pm-list .product-card .pm-row { display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+#product-manager #pm-list .product-card .pm-actions { display:flex; gap:8px; justify-content:flex-end; }
+#product-manager #pm-list .product-card .pm-actions .btn { padding:8px 12px; }
+
+/* Hide image preview by default; shown when src present via JS */
+#pm-image-preview { display:none; max-width:140px; max-height:90px; border-radius:6px; border:1px solid #eee; }
+
+/* Smaller buttons for product manager */
+.btn.pm-create, .btn.pm-clear { padding:10px 14px; font-size:0.95rem; }
+
+/* Section label and titles */
+.section-label { font-weight:600; display:block; margin-bottom:8px; }
+.pm-title { margin:0 0 8px 0; font-size:1rem; }
+
+.pm-thumb-wrap { width:120px; flex:0 0 120px; }
+
+
+
+/* Minor responsive tweaks */
+@media (max-width: 480px) {
+    #pm-create .pm-right { flex-direction:row; gap:8px; }
+    #pm-create .pm-right .pm-actions { margin-left:auto; }
+}

@@ -10,6 +10,9 @@ const products = [
     { id: 8, name: "Tomates 1kg", price: 2.40, image: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Verduras", rating: 4.1, description: "Tomates frescos y jugosos, cultivados localmente." }
 ];
 
+// Productos remotos cargados desde la API (tabla `productos`). Se fusionan con `products` al renderizar.
+let remoteProducts = [];
+
 // Datos de ofertas
 const offers = [
     { id: 9, name: "Coca-Cola 2L", price: 2.20, originalPrice: 2.80, image: "https://images.unsplash.com/photo-1554866585-cd94860890b7?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Bebidas", rating: 4.8, description: "Refresco Coca-Cola original en presentación familiar." },
@@ -117,6 +120,51 @@ async function initData() {
     cart = Array.isArray(response.cart) ? response.cart : [];
     currentUser = response.user || null;
     updateUserUI();
+}
+
+/**
+ * Obtiene productos desde la API pública `products.list` y guarda en `remoteProducts`.
+ * Si falla, deja `remoteProducts` vacío.
+ */
+async function fetchRemoteProducts(limit = 100) {
+    try {
+        const res = await fetch(`api.php?action=products.list&limit=${encodeURIComponent(limit)}`);
+        const data = await res.json();
+        if (res.ok && data && data.success && Array.isArray(data.products)) {
+            // Mapear a la forma esperada por el render (name, image, id, price, description)
+            remoteProducts = data.products.map(p => ({
+                id: Number(p.id),
+                name: p.nombre || p.name || '',
+                image: p.imagen || p.image || p.seller_image || '',
+                price: typeof p.precio !== 'undefined' ? Number(p.precio) : (p.price ? Number(p.price) : 0),
+                description: p.descripcion || p.description || '',
+                rating: p.rating ? Number(p.rating) : 4.5,
+                originalPrice: p.precio_descuento ? Number(p.precio) : undefined,
+            }));
+        } else {
+            remoteProducts = [];
+        }
+    } catch (e) {
+        console.warn('No se pudieron cargar productos remotos:', e);
+        remoteProducts = [];
+    }
+}
+
+/**
+ * Devuelve el conjunto de productos que deben renderizarse, combinando remotos + locales sin duplicados.
+ */
+function getAllProductsCombined() {
+    const map = new Map();
+    // Preferir remoteProducts when ids clash
+    remoteProducts.forEach(p => {
+        if (p && typeof p.id !== 'undefined') map.set(Number(p.id), p);
+    });
+    products.forEach(p => {
+        if (p && typeof p.id !== 'undefined') {
+            if (!map.has(Number(p.id))) map.set(Number(p.id), p);
+        }
+    });
+    return Array.from(map.values());
 }
 
 // Generar estrellas de calificación
@@ -473,6 +521,8 @@ async function logout() {
 // Inicializar la aplicación                                
 document.addEventListener('DOMContentLoaded', async () => {
     await initData();
+    // intentar cargar productos remotos antes de renderizar la lista
+    await fetchRemoteProducts();
     initCart();
     initSearch(); // <-- Agrega esta línea
     updateUserUI();
@@ -570,10 +620,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         return cat;
     }
 
-    // Cargar productos si estamos en la página de productos
-    if (window.location.pathname.includes('products.php') || window.location.pathname.includes('index.php') || window.location.pathname.endsWith('/')) {
-    const urlParams = new URLSearchParams(window.location.search);
-    const initialCategory = mapToSupermercado(urlParams.get('category'));
+    // Cargar productos si estamos en la página de productos o en la portada (index)
+    if (window.location.pathname.includes('products.php')) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const initialCategory = mapToSupermercado(urlParams.get('category'));
 
         // Marcar link activo según query param
         if (initialCategory) {
@@ -588,7 +638,31 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-    loadCombined(initialCategory);
+        loadCombined(initialCategory);
+    } else if (window.location.pathname.includes('index.php') || window.location.pathname.endsWith('/')) {
+        // On index page show featured products and separate discounts
+        const urlParams = new URLSearchParams(window.location.search);
+        const initialCategory = mapToSupermercado(urlParams.get('category'));
+
+        // mark active link if present
+        if (initialCategory) {
+            document.querySelectorAll('.categories a').forEach(link => {
+                const href = link.getAttribute('href') || '';
+                const params = new URLSearchParams(href.split('?')[1] || '');
+                const cat = params.get('category');
+                if (cat && normalizeCategoryName(cat) === normalizeCategoryName(initialCategory)) {
+                    document.querySelectorAll('.categories a').forEach(i => i.classList.remove('active'));
+                    link.classList.add('active');
+                }
+            });
+        }
+
+        // Load featured products into products-container
+        loadProducts(initialCategory);
+        // Load discounted offers into offers-container and ensure it's visible
+        const offersContainer = document.getElementById('offers-container');
+        if (offersContainer) offersContainer.style.display = '';
+        loadOffers(initialCategory);
     }
 
     // Handle back/forward navigation to update category filter
@@ -645,7 +719,8 @@ function loadProducts(category = null) {
 
         const supermercadoGroup = new Set(['supermercado', 'huevos', 'granos', 'aceites', 'pastas', 'verduras', 'farmacia', 'farmacias']);
 
-        const filtered = products.filter(p => {
+        const all = getAllProductsCombined();
+        const filtered = all.filter(p => {
             if (!selected) return true;
             const cat = normalize(p.category);
             if (selected === 'supermercado') {
@@ -655,7 +730,7 @@ function loadProducts(category = null) {
         });
 
         // Renderizar productos filtrados
-        filtered.forEach(product => {
+    filtered.forEach(product => {
             const productCard = document.createElement('a');
             productCard.className = 'product-card';
             productCard.href = `product-detail.php?id=${product.id}`;
@@ -688,57 +763,7 @@ function loadProducts(category = null) {
             productsContainer.appendChild(productCard);
         });
 
-        // Además mostramos las ofertas que coincidan con la misma categoría
-        const offersFiltered = offers.filter(p => {
-            if (!selected) return true;
-            const cat = normalize(p.category);
-            if (selected === 'supermercado') {
-                return supermercadoGroup.has(cat) || cat === selected;
-            }
-            return cat === selected;
-        });
-
-        offersFiltered.forEach(offer => {
-            const discount = Math.round(((offer.originalPrice - offer.price) / offer.originalPrice) * 100);
-
-            const offerCard = document.createElement('a');
-            offerCard.className = 'product-card';
-            offerCard.href = `product-detail.php?id=${offer.id}`;
-            offerCard.innerHTML = `
-                <div style="position: absolute; top: 10px; left: 10px; background-color: var(--primary-color); color: white; padding: 5px 10px; border-radius: 4px; font-weight: bold; z-index: 1;">
-                    -${discount}%
-                </div>
-                <div class="product-image">
-                    <img src="${offer.image}" alt="${offer.name}">
-                </div>
-                <div class="product-info">
-                    <h4 class="product-title">${offer.name}</h4>
-                    <div class="product-rating">
-                        ${generateRatingStars(offer.rating)}
-                        <span style="color: var(--gray-color); font-size: 0.9rem;">${offer.rating}</span>
-                    </div>
-                    <div class="product-price">
-                        <span style="color: var(--primary-color); font-size: 1.3rem; font-weight: 700;">$${offer.price.toFixed(2)}</span>
-                        <span style="color: var(--gray-color); text-decoration: line-through; margin-left: 5px; font-size: 1rem;">$${offer.originalPrice.toFixed(2)}</span>
-                    </div>
-                    <button class="add-to-cart" data-id="${offer.id}">
-                        <i class="fas fa-cart-plus"></i> Agregar
-                    </button>
-                </div>
-            `;
-
-            const addOfferButton = offerCard.querySelector('.add-to-cart');
-            if (addOfferButton) {
-                addOfferButton.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const productId = parseInt(e.currentTarget.dataset.id);
-                    addToCart(productId);
-                });
-            }
-
-            productsContainer.appendChild(offerCard);
-        });
+        // NOTE: ofertas se muestran en su propia sección (loadOffers). No agregamos ofertas aquí.
 
         setTimeout(hideLoader, 120);
     }, 120);
@@ -853,7 +878,7 @@ function loadCombined(category = null) {
         if (offersContainer) offersContainer.style.display = 'none';
 
         // Filtrar productos y ofertas por categoría
-        const filteredProducts = products.filter(p => {
+        const filteredProducts = getAllProductsCombined().filter(p => {
             if (!selected) return true;
             const cat = normalize(p.category);
             if (selected === 'supermercado') return supermercadoGroup.has(cat) || cat === selected;
@@ -871,14 +896,14 @@ function loadCombined(category = null) {
         const seen = new Set();
         const combined = [];
 
-        filteredProducts.forEach(p => {
+    filteredProducts.forEach(p => {
             if (!seen.has(p.id)) {
                 seen.add(p.id);
                 combined.push({ item: p, isOffer: false });
             }
         });
 
-        filteredOffers.forEach(o => {
+    filteredOffers.forEach(o => {
             if (!seen.has(o.id)) {
                 seen.add(o.id);
                 combined.push({ item: o, isOffer: true });
@@ -1007,7 +1032,7 @@ function renderProductDetail() {
         return;
     }
 
-    let product = products.find(p => p.id === id) || offers.find(p => p.id === id);
+    let product = getAllProductsCombined().find(p => Number(p.id) === id) || offers.find(p => p.id === id);
 
     if (!product) {
         container.innerHTML = `

@@ -141,10 +141,29 @@ function bootstrapSchema(PDO $pdo): void
             `contrasena` VARCHAR(64) NOT NULL,
             store_name VARCHAR(255) NULL,
             store_address VARCHAR(255) NULL,
-            store_hours VARCHAR(255) NULL,
+            store_hours TEXT NULL,
             store_type VARCHAR(100) NULL,
             tax_id VARCHAR(100) NULL,
+            store_image TEXT NULL,
+            store_products TEXT NULL,
             status VARCHAR(32) DEFAULT 'pending'
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+    );
+
+    // Tabla para productos ofrecidos por vendedores
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS productos (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            vendedor_phone BIGINT UNSIGNED NOT NULL,
+            nombre VARCHAR(255) NOT NULL,
+            imagen TEXT NULL,
+            precio DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+            descripcion TEXT NULL,
+            descuento_activo TINYINT(1) DEFAULT 0,
+            precio_descuento DECIMAL(10,2) NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            CONSTRAINT fk_productos_vendedor FOREIGN KEY (vendedor_phone) REFERENCES vendedor(numero_telefono) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
     );
 }
@@ -474,6 +493,8 @@ try {
 
         if ($row && isset($row['contraseña']) && (string) $row['contraseña'] === $password) {
             $userId = (int) $row['numero_telefono'];
+            // Ensure any existing seller session is cleared when logging in as buyer
+            unset($_SESSION['vendedor_phone']);
             $_SESSION['comprador_phone'] = $userId;
             mergeSessionCartIntoUser($pdo, $userId, session_id());
             $cart = loadCart($pdo, $userId, session_id());
@@ -493,6 +514,8 @@ try {
 
         if ($sellerRow && isset($sellerRow['contrasena']) && (string) $sellerRow['contrasena'] === $password) {
             $userId = (int) $sellerRow['numero_telefono'];
+            // Ensure any existing buyer session is cleared when logging in as seller
+            unset($_SESSION['comprador_phone']);
             $_SESSION['vendedor_phone'] = $userId;
             mergeSessionCartIntoUser($pdo, $userId, session_id());
             $cart = loadCart($pdo, $userId, session_id());
@@ -597,6 +620,8 @@ try {
             ]);
 
             $userId = $phone;
+            // Clear any buyer session when registering a seller
+            unset($_SESSION['comprador_phone']);
             $_SESSION['vendedor_phone'] = $userId;
 
             $stmt = $pdo->prepare('SELECT * FROM vendedor WHERE numero_telefono = :numero_telefono LIMIT 1');
@@ -643,8 +668,10 @@ try {
             'direccion_entrega' => $address,
         ]);
 
-        $userId = $phone;
-        $_SESSION['comprador_phone'] = $userId;
+    $userId = $phone;
+    // Clear any seller session when registering a buyer
+    unset($_SESSION['vendedor_phone']);
+    $_SESSION['comprador_phone'] = $userId;
 
         $stmt = $pdo->prepare('SELECT * FROM comprador WHERE numero_telefono = :numero_telefono LIMIT 1');
         $stmt->execute(['numero_telefono' => $userId]);
@@ -692,7 +719,9 @@ try {
     }
 
     if ($action === 'logout' && $method === 'POST') {
+        // Clear both possible session keys
         unset($_SESSION['comprador_phone']);
+        unset($_SESSION['vendedor_phone']);
 
         jsonResponse([
             'success' => true,
@@ -700,11 +729,225 @@ try {
         ]);
     }
 
+    // Productos: API CRUD
+    if ($action === 'products.list' && $method === 'GET') {
+        $params = $_GET;
+        // Read raw vendedor_phone as string and keep only digits to avoid PHP int overflow on some platforms
+        $vendedorPhoneRaw = isset($params['vendedor_phone']) ? (string)$params['vendedor_phone'] : '';
+        $vendedorPhone = null;
+        if ($vendedorPhoneRaw !== '') {
+            $digits = preg_replace('/\D+/', '', $vendedorPhoneRaw);
+            if ($digits !== '') {
+                $vendedorPhone = $digits; // keep as string (MySQL will cast) to avoid overflow
+            }
+        }
+        $limit = isset($params['limit']) ? (int)$params['limit'] : 50;
+
+        // Build vendor fields dynamically to be compatible with older schemas that may lack new columns
+        $vendorColsStmt = $pdo->prepare("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'vendedor' AND COLUMN_NAME IN ('store_name','store_image')");
+        $vendorColsStmt->execute();
+        $vendorCols = $vendorColsStmt->fetchAll(PDO::FETCH_COLUMN, 0);
+        $selectParts = ['p.*'];
+        if (in_array('store_name', $vendorCols, true)) {
+            $selectParts[] = 'v.store_name AS seller_name';
+        }
+        if (in_array('store_image', $vendorCols, true)) {
+            $selectParts[] = 'v.store_image AS seller_image';
+        }
+        $sql = 'SELECT ' . implode(', ', $selectParts) . ' FROM productos p LEFT JOIN vendedor v ON p.vendedor_phone = v.numero_telefono';
+        $conds = [];
+        $bind = [];
+        if ($vendedorPhone !== null && $vendedorPhone > 0) {
+            $conds[] = 'p.vendedor_phone = :vendedor_phone';
+            $bind['vendedor_phone'] = $vendedorPhone;
+        }
+
+        if (!empty($conds)) {
+            $sql .= ' WHERE ' . implode(' AND ', $conds);
+        }
+
+        // Some MySQL drivers have issues binding LIMIT as a parameter when native prepares are used.
+        // Safely append the integer-cast limit to the query.
+        $sql .= ' ORDER BY p.created_at DESC LIMIT ' . (int)$limit;
+        $stmt = $pdo->prepare($sql);
+        // Execute with the bind array and let PDO infer types; this is more robust for large bigint values
+        $stmt->execute($bind);
+        $rows = $stmt->fetchAll();
+
+        jsonResponse(['success' => true, 'products' => $rows]);
+    }
+
+    if ($action === 'products.get' && $method === 'GET') {
+        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+        if ($id <= 0) {
+            jsonResponse(['success' => false, 'message' => 'ID inválido'], 422);
+        }
+
+    // Build vendor fields dynamically for compatibility with older schemas
+    $vendorColsStmt2 = $pdo->prepare("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'vendedor' AND COLUMN_NAME IN ('store_name','store_image')");
+    $vendorColsStmt2->execute();
+    $vendorCols2 = $vendorColsStmt2->fetchAll(PDO::FETCH_COLUMN, 0);
+    $selectParts2 = ['p.*'];
+    if (in_array('store_name', $vendorCols2, true)) { $selectParts2[] = 'v.store_name AS seller_name'; }
+    if (in_array('store_image', $vendorCols2, true)) { $selectParts2[] = 'v.store_image AS seller_image'; }
+    $sqlGet = 'SELECT ' . implode(', ', $selectParts2) . ' FROM productos p LEFT JOIN vendedor v ON p.vendedor_phone = v.numero_telefono WHERE p.id = :id LIMIT 1';
+    $stmt = $pdo->prepare($sqlGet);
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            jsonResponse(['success' => false, 'message' => 'Producto no encontrado'], 404);
+        }
+
+        jsonResponse(['success' => true, 'product' => $row]);
+    }
+
+    if ($action === 'products.create' && $method === 'POST') {
+        $user = currentUser($pdo);
+        if (!$user || ($user['role'] ?? '') !== 'seller') {
+            jsonResponse(['success' => false, 'message' => 'Autenticación de vendedor requerida'], 403);
+        }
+
+        $body = getRequestData();
+        $nombre = isset($body['nombre']) ? trim((string)$body['nombre']) : '';
+        $imagen = isset($body['imagen']) ? trim((string)$body['imagen']) : '';
+        $precio = isset($body['precio']) ? (float)$body['precio'] : 0.0;
+        $descripcion = isset($body['descripcion']) ? trim((string)$body['descripcion']) : '';
+        $descuento_activo = isset($body['descuento_activo']) && ($body['descuento_activo'] === '1' || $body['descuento_activo'] === 'true' || $body['descuento_activo'] === 1) ? 1 : 0;
+        $precio_descuento = isset($body['precio_descuento']) ? (float)$body['precio_descuento'] : null;
+
+        if ($nombre === '') {
+            jsonResponse(['success' => false, 'message' => 'Nombre requerido'], 422);
+        }
+
+        $insert = $pdo->prepare('INSERT INTO productos (vendedor_phone, nombre, imagen, precio, descripcion, descuento_activo, precio_descuento) VALUES (:vendedor_phone, :nombre, :imagen, :precio, :descripcion, :descuento_activo, :precio_descuento)');
+        $insert->execute([
+            'vendedor_phone' => (int)$user['id'],
+            'nombre' => $nombre,
+            'imagen' => $imagen,
+            'precio' => $precio,
+            'descripcion' => $descripcion,
+            'descuento_activo' => $descuento_activo,
+            'precio_descuento' => $precio_descuento,
+        ]);
+
+        $newId = (int)$pdo->lastInsertId();
+        jsonResponse(['success' => true, 'id' => $newId], 201);
+    }
+
+    if ($action === 'products.update' && $method === 'POST') {
+        $user = currentUser($pdo);
+        if (!$user || ($user['role'] ?? '') !== 'seller') {
+            jsonResponse(['success' => false, 'message' => 'Autenticación de vendedor requerida'], 403);
+        }
+
+        $body = getRequestData();
+        $id = isset($body['id']) ? (int)$body['id'] : 0;
+        if ($id <= 0) {
+            jsonResponse(['success' => false, 'message' => 'ID inválido'], 422);
+        }
+
+        $stmt = $pdo->prepare('SELECT vendedor_phone FROM productos WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            jsonResponse(['success' => false, 'message' => 'Producto no encontrado'], 404);
+        }
+
+        if ((int)$row['vendedor_phone'] !== (int)$user['id']) {
+            jsonResponse(['success' => false, 'message' => 'No tienes permiso para modificar este producto'], 403);
+        }
+
+        $fields = [];
+        $bind = ['id' => $id];
+        if (isset($body['nombre'])) { $fields[] = 'nombre = :nombre'; $bind['nombre'] = trim((string)$body['nombre']); }
+        if (isset($body['imagen'])) { $fields[] = 'imagen = :imagen'; $bind['imagen'] = trim((string)$body['imagen']); }
+        if (isset($body['precio'])) { $fields[] = 'precio = :precio'; $bind['precio'] = (float)$body['precio']; }
+        if (isset($body['descripcion'])) { $fields[] = 'descripcion = :descripcion'; $bind['descripcion'] = trim((string)$body['descripcion']); }
+        if (isset($body['descuento_activo'])) { $fields[] = 'descuento_activo = :descuento_activo'; $bind['descuento_activo'] = ($body['descuento_activo'] === '1' || $body['descuento_activo'] === 'true' || $body['descuento_activo'] === 1) ? 1 : 0; }
+        if (array_key_exists('precio_descuento', $body)) { $fields[] = 'precio_descuento = :precio_descuento'; $bind['precio_descuento'] = $body['precio_descuento'] === '' ? null : (float)$body['precio_descuento']; }
+
+        if (empty($fields)) {
+            jsonResponse(['success' => false, 'message' => 'Nada para actualizar'], 422);
+        }
+
+        $sql = 'UPDATE productos SET ' . implode(', ', $fields) . ' WHERE id = :id';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($bind);
+
+        jsonResponse(['success' => true]);
+    }
+
+    if ($action === 'products.delete' && $method === 'POST') {
+        $user = currentUser($pdo);
+        if (!$user || ($user['role'] ?? '') !== 'seller') {
+            jsonResponse(['success' => false, 'message' => 'Autenticación de vendedor requerida'], 403);
+        }
+
+        $body = getRequestData();
+        $id = isset($body['id']) ? (int)$body['id'] : 0;
+        if ($id <= 0) {
+            jsonResponse(['success' => false, 'message' => 'ID inválido'], 422);
+        }
+
+        $stmt = $pdo->prepare('DELETE FROM productos WHERE id = :id AND vendedor_phone = :vendedor_phone');
+        $stmt->execute(['id' => $id, 'vendedor_phone' => (int)$user['id']]);
+
+        jsonResponse(['success' => true]);
+    }
+
+    // Upload product image (multipart/form-data)
+    if ($action === 'products.upload' && $method === 'POST') {
+        $user = currentUser($pdo);
+        if (!$user || ($user['role'] ?? '') !== 'seller') {
+            jsonResponse(['success' => false, 'message' => 'Autenticación de vendedor requerida'], 403);
+        }
+
+        if (!isset($_FILES['image']) || !is_uploaded_file($_FILES['image']['tmp_name'])) {
+            jsonResponse(['success' => false, 'message' => 'Archivo no recibido'], 422);
+        }
+
+        $file = $_FILES['image'];
+        $origName = basename($file['name']);
+        $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+        $allowed = ['jpg','jpeg','png','webp','gif'];
+        if (!in_array($ext, $allowed, true)) {
+            jsonResponse(['success' => false, 'message' => 'Tipo de archivo no permitido'], 422);
+        }
+
+        $uploadDir = __DIR__ . '/uploads/products';
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+
+        $newName = uniqid('prod_') . '.' . $ext;
+        $dest = $uploadDir . '/' . $newName;
+
+        if (!move_uploaded_file($file['tmp_name'], $dest)) {
+            jsonResponse(['success' => false, 'message' => 'No se pudo mover el archivo'], 500);
+        }
+
+        $relative = 'uploads/products/' . $newName;
+        jsonResponse(['success' => true, 'path' => $relative], 201);
+    }
+
     jsonResponse([
         'success' => false,
         'message' => 'Ruta no válida',
     ], 404);
 } catch (Throwable $e) {
+    // Log error to a local file for easier debugging on development environments
+    try {
+        $logPath = __DIR__ . '/api_errors.log';
+        $entry = date('c') . " | ACTION=" . (isset($_GET['action']) ? $_GET['action'] : '(none)') . " | URI=" . ($_SERVER['REQUEST_URI'] ?? '') . "\n";
+        $entry .= "GET=" . json_encode($_GET, JSON_UNESCAPED_UNICODE) . "\n";
+        $entry .= "POST=" . json_encode($_POST, JSON_UNESCAPED_UNICODE) . "\n";
+        $entry .= "ERROR=" . $e->getMessage() . "\n";
+        $entry .= $e->getTraceAsString() . "\n\n";
+        @file_put_contents($logPath, $entry, FILE_APPEND | LOCK_EX);
+    } catch (Throwable $_) {
+        // ignore logging errors
+    }
+
     jsonResponse([
         'success' => false,
         'message' => 'Error de servidor',

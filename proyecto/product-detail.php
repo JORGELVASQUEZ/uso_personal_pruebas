@@ -1,6 +1,22 @@
 <?php
-// Product detail placeholder to match main.js links
-// We'll read the product id from GET and let main.js render details from its product array
+// Product detail: intenta cargar desde la tabla `productos` si existe, sino deja el contenedor vacío y main.js lo manejará.
+$product = null;
+$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+if ($id > 0) {
+    try {
+        $pdo = new PDO('mysql:host=127.0.0.1;dbname=order_flow;charset=utf8mb4', 'root', '', [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false,
+        ]);
+
+        $stmt = $pdo->prepare('SELECT p.*, v.store_name AS seller_name, v.store_image AS seller_image FROM productos p LEFT JOIN vendedor v ON p.vendedor_phone = v.numero_telefono WHERE p.id = :id LIMIT 1');
+        $stmt->execute(['id' => $id]);
+        $product = $stmt->fetch();
+    } catch (Throwable $e) {
+        $product = null;
+    }
+}
 ?>
 <!doctype html>
 <html lang="es">
@@ -55,7 +71,30 @@
     </header>
 
     <main class="container">
-        <div id="product-detail" class="product-detail"></div>
+        <div id="product-detail" class="product-detail">
+            <?php if ($product): ?>
+                <div class="product-detail-card">
+                    <div class="detail-image"><img src="<?php echo htmlspecialchars($product['imagen'] ?: $product['seller_image'] ?: ''); ?>" alt="<?php echo htmlspecialchars($product['nombre']); ?>"></div>
+                    <div class="detail-info">
+                        <h2><?php echo htmlspecialchars($product['nombre']); ?></h2>
+                        <div class="detail-price">
+                            <?php if (!empty($product['descuento_activo'])): ?>
+                                <span class="price-discount">$<?php echo number_format((float)$product['precio_descuento'], 2); ?></span>
+                                <span class="price-original">$<?php echo number_format((float)$product['precio'], 2); ?></span>
+                            <?php else: ?>
+                                <span class="price">$<?php echo number_format((float)$product['precio'], 2); ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <p class="detail-description"><?php echo nl2br(htmlspecialchars($product['descripcion'] ?? '')); ?></p>
+                        <?php if (!empty($product['seller_name'])): ?>
+                            <div class="detail-seller">Vendido por: <?php echo htmlspecialchars($product['seller_name']); ?></div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php else: ?>
+                <!-- Si no se encontró producto en BD, main.js puede manejar la renderización desde su array local -->
+            <?php endif; ?>
+        </div>
     </main>
 
     <!-- Carrito de compras (shared) -->

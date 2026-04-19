@@ -78,8 +78,9 @@ try {
     ]);
 
     if ($isSeller) {
+        // Use SELECT * to avoid errors if the DB schema hasn't been migrated yet
         $stmt = $pdo->prepare(
-            'SELECT numero_telefono, nombres, apellidos, correo_electronico, store_name, store_address, store_hours, store_type, tax_id, status
+            'SELECT *
              FROM vendedor
              WHERE numero_telefono = :numero_telefono
              LIMIT 1'
@@ -101,9 +102,9 @@ try {
             $storeType = isset($_POST['store_type']) ? trim((string) $_POST['store_type']) : '';
             $taxId = isset($_POST['tax_id']) ? trim((string) $_POST['tax_id']) : '';
 
-            if ($storeName === '' || $storeAddress === '') {
-                $errorMessage = 'El nombre y la dirección de la tienda son obligatorios.';
-            } else {
+                if ($storeName === '' || $storeAddress === '') {
+                    $errorMessage = 'El nombre y la dirección de la tienda son obligatorios.';
+                } else {
                 // Normalize hours input into a JSON-serializable structure
                 $normalizedHours = null;
                 if (is_array($hoursInput)) {
@@ -133,32 +134,127 @@ try {
                     }
                 }
 
+                // handle store image upload (optional)
+                $storeImagePath = null;
+                if (isset($_FILES['store_image']) && is_uploaded_file($_FILES['store_image']['tmp_name'])) {
+                    $uploadDir = __DIR__ . '/uploads/stores';
+                    if (!is_dir($uploadDir)) {
+                        mkdir($uploadDir, 0755, true);
+                    }
+                    $origName = basename($_FILES['store_image']['name']);
+                    $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+                    $allowed = ['jpg','jpeg','png','webp','gif'];
+                    if (in_array($ext, $allowed, true)) {
+                        $newName = uniqid('store_') . '.' . $ext;
+                        $dest = $uploadDir . '/' . $newName;
+                        if (move_uploaded_file($_FILES['store_image']['tmp_name'], $dest)) {
+                            // store relative path
+                            $storeImagePath = 'uploads/stores/' . $newName;
+                        }
+                    }
+                }
+                // if no new image uploaded, preserve existing image path
+                if ($storeImagePath === null) {
+                    $storeImagePath = isset($row['store_image']) ? $row['store_image'] : null;
+                }
+
+                // normalize products list (simple: name, price, image_url)
+                $productsInput = isset($_POST['products']) && is_array($_POST['products']) ? $_POST['products'] : [];
+                $normalizedProducts = [];
+                foreach ($productsInput as $p) {
+                    $pname = isset($p['name']) ? trim((string) $p['name']) : '';
+                    $pprice = isset($p['price']) ? trim((string) $p['price']) : '';
+                    $pimage = isset($p['image']) ? trim((string) $p['image']) : '';
+                    if ($pname === '') continue;
+                    $normalizedProducts[] = [
+                        'name' => $pname,
+                        'price' => $pprice !== '' ? $pprice : null,
+                        'image' => $pimage !== '' ? $pimage : null,
+                    ];
+                }
+
                 try {
-                    $updateStmt = $pdo->prepare(
-                        'UPDATE vendedor SET store_name = :store_name, store_address = :store_address, store_hours = :store_hours, store_type = :store_type, tax_id = :tax_id WHERE numero_telefono = :numero_telefono'
+                    // Determine which columns exist in the vendedor table so we only update available columns
+                    $colStmt = $pdo->prepare(
+                        'SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = :table'
                     );
+                    $colStmt->execute(['schema' => DB_NAME, 'table' => 'vendedor']);
+                    $cols = $colStmt->fetchAll(PDO::FETCH_COLUMN, 0);
+                    $cols = is_array($cols) ? array_map('strtolower', $cols) : [];
 
-                    $hoursToStore = $normalizedHours !== null ? json_encode($normalizedHours, JSON_UNESCAPED_UNICODE) : null;
-
-                    $updateStmt->execute([
+                    $allowed = [
                         'store_name' => $storeName,
                         'store_address' => $storeAddress,
-                        'store_hours' => $hoursToStore,
+                        'store_hours' => $normalizedHours !== null ? json_encode($normalizedHours, JSON_UNESCAPED_UNICODE) : null,
                         'store_type' => $storeType,
                         'tax_id' => $taxId,
-                        'numero_telefono' => $identifier,
-                    ]);
+                        'store_image' => $storeImagePath,
+                        'store_products' => !empty($normalizedProducts) ? json_encode($normalizedProducts, JSON_UNESCAPED_UNICODE) : null,
+                    ];
 
-                    $successMessage = 'Datos de la tienda actualizados correctamente.';
+                    $setParts = [];
+                    $params = [];
+                    foreach ($allowed as $col => $val) {
+                        if (in_array($col, $cols, true)) {
+                            $setParts[] = "$col = :$col";
+                            $params[$col] = $val;
+                        }
+                    }
 
-                    $reloadStmt = $pdo->prepare('SELECT numero_telefono, nombres, apellidos, correo_electronico, store_name, store_address, store_hours, store_type, tax_id, status FROM vendedor WHERE numero_telefono = :numero_telefono LIMIT 1');
-                    $reloadStmt->execute(['numero_telefono' => $identifier]);
-                    $reloadedRow = $reloadStmt->fetch();
-                    if ($reloadedRow) {
-                        $row = $reloadedRow;
+                    if (empty($setParts)) {
+                        // nothing to update on this DB schema
+                        $errorMessage = 'No hay campos de tienda disponibles para actualizar en la base de datos.';
+                    } else {
+                        $sql = 'UPDATE vendedor SET ' . implode(', ', $setParts) . ' WHERE numero_telefono = :numero_telefono';
+                        $params['numero_telefono'] = $identifier;
+                        $updateStmt = $pdo->prepare($sql);
+                        $updateStmt->execute($params);
+
+                        $successMessage = 'Datos de la tienda actualizados correctamente.';
+
+                        // If a dedicated productos table exists, sync normalized products into it
+                        $colCheck = $pdo->prepare("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = 'productos'");
+                        $colCheck->execute(['schema' => DB_NAME]);
+                        $hasProductos = (bool) $colCheck->fetchColumn();
+                        if ($hasProductos) {
+                            // replace vendor products: delete existing and insert new
+                            $pdo->beginTransaction();
+                            try {
+                                $del = $pdo->prepare('DELETE FROM productos WHERE vendedor_phone = :vendedor_phone');
+                                $del->execute(['vendedor_phone' => $identifier]);
+
+                                if (!empty($normalizedProducts)) {
+                                    $ins = $pdo->prepare('INSERT INTO productos (vendedor_phone, nombre, imagen, precio, descripcion, descuento_activo, precio_descuento) VALUES (:vendedor_phone, :nombre, :imagen, :precio, :descripcion, :descuento_activo, :precio_descuento)');
+                                    foreach ($normalizedProducts as $p) {
+                                        $ins->execute([
+                                            'vendedor_phone' => $identifier,
+                                            'nombre' => $p['name'],
+                                            'imagen' => $p['image'] ?? null,
+                                            'precio' => $p['price'] !== null ? (float) $p['price'] : 0.0,
+                                            'descripcion' => null,
+                                            'descuento_activo' => 0,
+                                            'precio_descuento' => null,
+                                        ]);
+                                    }
+                                }
+
+                                $pdo->commit();
+                            } catch (Throwable $txEx) {
+                                if ($pdo->inTransaction()) $pdo->rollBack();
+                                // ignore product sync errors but keep user update result
+                            }
+                        }
+
+                        // reload using SELECT * for compatibility with DB schema
+                        $reloadStmt = $pdo->prepare('SELECT * FROM vendedor WHERE numero_telefono = :numero_telefono LIMIT 1');
+                        $reloadStmt->execute(['numero_telefono' => $identifier]);
+                        $reloadedRow = $reloadStmt->fetch();
+                        if ($reloadedRow) {
+                            $row = $reloadedRow;
+                        }
                     }
                 } catch (Throwable $ex) {
-                    $errorMessage = 'No fue posible actualizar los datos de la tienda.';
+                    $errorMessage = 'No fue posible actualizar los datos de la tienda: ' . $ex->getMessage();
                 }
             }
         }
@@ -173,6 +269,15 @@ try {
             }
         }
 
+        // decode store_products
+        $decodedProducts = null;
+        if (!empty($row['store_products'])) {
+            $tmpP = json_decode((string) $row['store_products'], true);
+            if (is_array($tmpP)) {
+                $decodedProducts = $tmpP;
+            }
+        }
+
         $profile = [
             'role' => 'seller',
             'name' => $fullName !== '' ? $fullName : 'Vendedor',
@@ -182,6 +287,8 @@ try {
             'storeAddress' => (string) ($row['store_address'] ?? ''),
             // storeHours will be an array (decoded) or null
             'storeHours' => $decodedHours,
+            'storeImage' => (string) ($row['store_image'] ?? ''),
+            'storeProducts' => $decodedProducts,
             'storeType' => (string) ($row['store_type'] ?? ''),
             'taxId' => (string) ($row['tax_id'] ?? ''),
             'status' => (string) ($row['status'] ?? 'pending'),
@@ -315,6 +422,7 @@ try {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="profile-fixes.css">
     <style>
         .profile-card {
             background: white;
@@ -421,9 +529,12 @@ try {
         .schedule-day strong { font-size: 0.95rem; }
         .schedule-day label { margin-left: auto; font-weight: normal; }
         .time-input { width: 110px; }
+        /* hide header filters on profile page */
+        .profile-page .header-bottom { display: none; }
+        .profile-page .header-top { margin-bottom: 0; }
     </style>
 </head>
-<body>
+<body class="profile-page">
     <!-- Header (unificado con index.php) -->
     <header>
         <div class="container">
@@ -519,10 +630,21 @@ try {
                     </div>
                 </form>
                 <?php else: ?>
-                <form method="post" class="profile-form">
+                <form method="post" class="profile-form" enctype="multipart/form-data">
                     <div class="form-group">
                         <label>Teléfono</label>
                         <div class="profile-value"><?= escapeHtml($profile['phone']); ?></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Foto de la tienda</label>
+                        <?php if (!empty($profile['storeImage'])): ?>
+                            <div style="margin-bottom:8px;">
+                                <img src="<?= escapeHtml($profile['storeImage']); ?>" alt="Foto tienda" style="max-width:160px; border-radius:8px; border:1px solid #eee;">
+                            </div>
+                        <?php endif; ?>
+                        <input type="file" name="store_image" accept="image/*">
+                        <small class="form-help">Sube una imagen representativa de tu tienda (jpg, png, webp).</small>
                     </div>
 
                     <div class="form-group">
@@ -589,6 +711,34 @@ try {
                         <button type="submit" class="btn">Guardar cambios</button>
                     </div>
                 </form>
+
+                <!-- Product manager: separado del formulario de la tienda. -->
+                <div class="form-group" id="product-manager-root">
+                    <label class="section-label">Productos de la tienda</label>
+                    <div id="product-manager">
+                        <div id="pm-list"></div>
+
+                        <div id="pm-create" class="pm-create">
+                            <h4 class="pm-title">Agregar producto</h4>
+                            <div class="pm-grid">
+                                <div class="pm-left">
+                                    <input type="text" id="pm-name" placeholder="Nombre" class="form-control" />
+                                    <input type="text" id="pm-image" placeholder="URL imagen (opcional)" class="form-control" />
+                                    <input type="file" id="pm-image-file" accept="image/*">
+                                    <img id="pm-image-preview" src="" alt="" />
+                                    <textarea id="pm-desc" placeholder="Descripción" class="form-control" rows="3"></textarea>
+                                </div>
+                                <div class="pm-right">
+                                    <input type="number" id="pm-price" placeholder="Precio" class="form-control pm-price" step="0.01">
+                                    <div class="pm-actions">
+                                        <button type="button" id="pm-create-btn" class="btn pm-create">Crear producto</button>
+                                        <button type="button" id="pm-clear-btn" class="btn pm-clear">Limpiar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <?php endif; ?>
             <?php else: ?>
                 <p class="message-error">No fue posible cargar tu perfil.</p>
@@ -597,5 +747,243 @@ try {
     </main>
 
     <script src="js/main.js"></script>
+    <script>
+    (function(){
+        const sellerPhone = <?= json_encode($profile['phone'] ?? ''); ?>;
+        const legacyProducts = <?= json_encode(is_array($profile['storeProducts']) ? $profile['storeProducts'] : []); ?>;
+        let pmProducts = [];
+
+        function createElementFromHTML(html) {
+            const div = document.createElement('div');
+            div.innerHTML = html.trim();
+            return div.firstChild;
+        }
+
+        async function fetchProducts() {
+            try {
+                const resp = await fetch(`api.php?action=products.list&vendedor_phone=${encodeURIComponent(sellerPhone)}`);
+                const data = await resp.json();
+                if (data && data.success && Array.isArray(data.products) && data.products.length > 0) {
+                    pmProducts = data.products;
+                } else {
+                    // fallback to legacy products if any
+                    pmProducts = Array.isArray(legacyProducts) && legacyProducts.length > 0 ? legacyProducts.map((p, i) => ({
+                        id: null,
+                        nombre: p.name ?? p.nombre ?? '',
+                        imagen: p.image ?? p.imagen ?? '',
+                        descripcion: p.description ?? p.descripcion ?? p.desc ?? '',
+                        precio: p.price ?? p.precio ?? 0,
+                        descuento_activo: 0,
+                        precio_descuento: null,
+                    })) : [];
+                }
+            } catch (err) {
+                pmProducts = Array.isArray(legacyProducts) ? legacyProducts : [];
+            }
+            renderProductsList();
+        }
+
+        function renderProductsList() {
+            const list = document.getElementById('pm-list');
+            list.innerHTML = '';
+            if (!pmProducts || pmProducts.length === 0) {
+                list.innerHTML = '<p style="color:#6b7280;">No hay productos aún. Usa el formulario "Agregar producto" para crear uno.</p>';
+                return;
+            }
+
+                pmProducts.forEach((p) => {
+                const idAttr = p.id ? `data-id=\"${p.id}\"` : '';
+                const html = `
+                    <div class="product-card" ${idAttr}>
+                        <div class="pm-thumb-wrap">
+                            <img class="pm-thumb" src="${escapeHtml(p.imagen || p.seller_image || '')}" alt="">
+                        </div>
+                        <div class="pm-main">
+                            <div class="pm-row">
+                                <input type="text" class="pm-input pm-name" placeholder="Nombre" value="${escapeHtml(p.nombre || p.name || '')}">
+                                <input type="number" class="pm-input pm-price" placeholder="Precio" value="${escapeHtml(String(p.precio || p.price || 0))}" step="0.01">
+                            </div>
+                            <div class="pm-row">
+                                <input type="text" class="pm-input pm-image" placeholder="URL imagen" value="${escapeHtml(p.imagen || p.image || '')}">
+                                <input type="file" class="pm-input pm-image-file" accept="image/*">
+                            </div>
+                            <div class="pm-row">
+                                <textarea class="pm-input pm-desc" placeholder="Descripción" rows="2">${escapeHtml(p.descripcion || p.description || '')}</textarea>
+                            </div>
+                            <div class="pm-actions">
+                                <button class="btn btn-outline pm-delete">Eliminar</button>
+                                <button class="btn pm-save">Guardar</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                const node = createElementFromHTML(html);
+                if (p.id) node.setAttribute('data-id', p.id);
+
+                // wire image file preview
+                const fileInput = node.querySelector('.pm-image-file');
+                const urlInput = node.querySelector('.pm-image');
+                const thumb = node.querySelector('.pm-thumb');
+                if (fileInput) {
+                    fileInput.addEventListener('change', function(e){
+                        const f = fileInput.files && fileInput.files[0];
+                        if (f) {
+                            const reader = new FileReader();
+                            reader.onload = function(ev){ thumb.src = ev.target.result; };
+                            reader.readAsDataURL(f);
+                        } else {
+                            // restore to url value
+                            thumb.src = urlInput.value || '';
+                        }
+                    });
+                }
+
+                // wire buttons
+                node.querySelector('.pm-save').addEventListener('click', async () => {
+                    const name = node.querySelector('.pm-name').value.trim();
+                    const price = node.querySelector('.pm-price').value;
+                    const image = node.querySelector('.pm-image').value.trim();
+                    const newFile = node.querySelector('.pm-image-file') && node.querySelector('.pm-image-file').files && node.querySelector('.pm-image-file').files[0];
+                    const desc = node.querySelector('.pm-desc').value.trim();
+
+                    if (!name) { showNotification('Nombre requerido', 'warning'); return; }
+                    if (price === '' || isNaN(Number(price))) { showNotification('Precio inválido', 'warning'); return; }
+
+                    try {
+                        let finalImage = image;
+                        if (newFile) {
+                            // upload image first
+                            const uploaded = await uploadImage(newFile);
+                            finalImage = uploaded;
+                        }
+
+                        if (p.id) {
+                            // update
+                            const body = { id: p.id, nombre: name, precio: price, imagen: finalImage, descripcion: desc };
+                            const res = await apiRequest('products.update', body, 'POST');
+                            if (res.success) {
+                                showNotification('Producto actualizado');
+                                fetchProducts();
+                            } else {
+                                showNotification(res.message || 'No se pudo actualizar', 'error');
+                            }
+                        } else {
+                            // create
+                            const body = { nombre: name, precio: price, imagen: finalImage, descripcion: desc };
+                            const res = await apiRequest('products.create', body, 'POST');
+                            if (res.success) {
+                                showNotification('Producto creado');
+                                fetchProducts();
+                            } else {
+                                showNotification(res.message || 'No se pudo crear', 'error');
+                            }
+                        }
+                    } catch (err) {
+                        showNotification(err.message || 'Error al subir imagen', 'error');
+                    }
+                });
+
+                node.querySelector('.pm-delete').addEventListener('click', async () => {
+                    if (!p.id) {
+                        // remove local-only (legacy) item
+                        pmProducts = pmProducts.filter(x => x !== p);
+                        renderProductsList();
+                        return;
+                    }
+                    if (!confirm('Eliminar producto?')) return;
+                    const res = await apiRequest('products.delete', { id: p.id }, 'POST');
+                    if (res.success) {
+                        showNotification('Producto eliminado');
+                        fetchProducts();
+                    } else {
+                        showNotification(res.message || 'No se pudo eliminar', 'error');
+                    }
+                });
+
+                list.appendChild(node);
+            });
+        }
+
+        // escape helper for HTML inserted values
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // Upload an image file using FormData to the API upload endpoint
+        async function uploadImage(file) {
+            const fd = new FormData();
+            fd.append('image', file);
+
+            const resp = await fetch('api.php?action=products.upload', {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin'
+            });
+
+            const data = await resp.json();
+            if (!resp.ok || !data.success) {
+                throw new Error(data.message || 'Error al subir imagen');
+            }
+
+            return data.path;
+        }
+
+        document.getElementById('pm-create-btn').addEventListener('click', async function(){
+            const name = document.getElementById('pm-name').value.trim();
+            const price = document.getElementById('pm-price').value;
+            const image = document.getElementById('pm-image').value.trim();
+            const fileInput = document.getElementById('pm-image-file');
+            const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+            const desc = document.getElementById('pm-desc').value.trim();
+
+            if (!name) { showNotification('Nombre requerido', 'warning'); return; }
+            if (price === '' || isNaN(Number(price))) { showNotification('Precio inválido', 'warning'); return; }
+            try {
+                let finalImage = image;
+                if (file) {
+                    finalImage = await uploadImage(file);
+                }
+
+                const body = { nombre: name, precio: price, imagen: finalImage, descripcion: desc };
+                const res = await apiRequest('products.create', body, 'POST');
+                if (res.success) {
+                    document.getElementById('pm-name').value = '';
+                    document.getElementById('pm-price').value = '';
+                    document.getElementById('pm-image').value = '';
+                    document.getElementById('pm-image-file').value = '';
+                    document.getElementById('pm-desc').value = '';
+                    const preview = document.getElementById('pm-image-preview');
+                    if (preview) { preview.style.display = 'none'; preview.src = ''; }
+                    showNotification('Producto creado');
+                    fetchProducts();
+                } else {
+                    showNotification(res.message || 'No se pudo crear', 'error');
+                }
+            } catch (err) {
+                showNotification(err.message || 'Error al subir imagen', 'error');
+            }
+        });
+
+        document.getElementById('pm-clear-btn').addEventListener('click', function(){
+            document.getElementById('pm-name').value = '';
+            document.getElementById('pm-price').value = '';
+            document.getElementById('pm-image').value = '';
+            document.getElementById('pm-image-file').value = '';
+            const preview = document.getElementById('pm-image-preview');
+            if (preview) { preview.style.display = 'none'; preview.src = ''; }
+            document.getElementById('pm-desc').value = '';
+        });
+
+        // initial load
+        fetchProducts();
+    })();
+    </script>
 </body>
 </html>
