@@ -139,8 +139,8 @@ async function fetchRemoteProducts(limit = 100) {
         } else {
             remoteProducts = [];
         }
-    } catch (e) {
-        // Fallo silencioso al cargar remotos — usar fallback local
+        } catch (e) {
+        // Fallo silencioso al cargar remotos — usar alternativa local
         remoteProducts = [];
     }
     }
@@ -162,8 +162,9 @@ function getAllProductsCombined() {
 }
 
 /**
- * Map an API product row to the normalized shape used by the front-end.
- * @param {object} p API product row
+ * Mapea una fila de producto proporcionada por la API a la forma normalizada usada por el front-end.
+ * Devuelve campos en español e inglés para compatibilidad con renderizadores.
+ * @param {object} p Fila de producto devuelta por la API
  */
 function mapApiProduct(p) {
     return {
@@ -184,9 +185,9 @@ function mapApiProduct(p) {
 }
 
 /**
- * Fetch products from the API using a search term and render results client-side.
- * This allows searching from any page without navigating to products.php.
- * @param {string} term
+ * Obtiene productos desde la API usando un término de búsqueda y muestra los resultados en el cliente.
+ * Esto permite buscar desde cualquier página sin navegar a `products.php`.
+ * @param {string} term Término de búsqueda
  */
 async function apiSearchAndDisplay(term) {
     if (!term || term.trim() === '') {
@@ -624,15 +625,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Agregar funcionalidad a las categorías
     document.querySelectorAll('.categories a').forEach(link => {
         link.addEventListener('click', (e) => {
-            // Allow full navigation when clicking categories from the index (home).
-            // Only intercept clicks and do AJAX filtering when we're on products.php.
+            // Permitir la navegación normal al hacer clic en categorías desde la portada (index).
+            // Solo interceptar clics y hacer filtrado AJAX cuando estemos en products.php.
             const href = link.getAttribute('href') || '';
             const params = new URLSearchParams(href.split('?')[1] || '');
             let categoryParam = params.get('category');
 
             if (!window.location.pathname.includes('products.php')) {
-                // Not on products page — let the link navigate to products.php?category=...
-                return; // default browser navigation
+                // No estamos en la página de productos — dejar que el enlace navegue a products.php?category=...
+                return; // navegación por defecto del navegador
             }
 
             e.preventDefault();
@@ -664,17 +665,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     
     // Helper: normalizar nombres de categoría (quita acentos y lower-case)
+    /**
+     * Normaliza un nombre de categoría para comparaciones.
+     * - Convierte a minúsculas
+     * - Quita diacríticos (acentos)
+     * - Recorta espacios al inicio/fin
+     * @param {string|null|undefined} str Texto de categoría
+     * @returns {string} Cadena normalizada lista para comparar
+     */
     function normalizeCategoryName(str) {
         if (!str) return '';
         try {
             return String(str).toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
         } catch (e) {
-            // Fallback for older browsers without \p{Diacritic}
+            // Alternativa para navegadores antiguos sin soporte de \p{Diacritic}
             return String(str).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
         }
     }
 
-    // Map specific categories into 'supermercado' (handles legacy links/bookmarks)
+    // Mapear categorías específicas a 'supermercado' (soporta enlaces antiguos / bookmarks)
+    /**
+     * Mapea categorías específicas heredadas a la categoría agrupada 'supermercado'.
+     * Esto permite que enlaces antiguos como 'huevos' o 'granos' aparezcan bajo la misma categoría.
+     * @param {string|null|undefined} cat Nombre de categoría original
+     * @returns {string|null|undefined} Categoría mapeada (o la original si no aplica)
+     */
     function mapToSupermercado(cat) {
         if (!cat) return cat;
         const m = normalizeCategoryName(cat);
@@ -703,7 +718,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         loadCombined(initialCategory);
     } else if (window.location.pathname.includes('index.php') || window.location.pathname.endsWith('/')) {
-        // On index page show featured products and separate discounts
+    // En la página principal (index) mostrar productos destacados y ofertas por separado
         const urlParams = new URLSearchParams(window.location.search);
         const initialCategory = mapToSupermercado(urlParams.get('category'));
 
@@ -728,7 +743,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadOffers(initialCategory);
     }
 
-    // Handle back/forward navigation to update category filter
+    // Manejar la navegación atrás/adelante para actualizar el filtro de categoría
     window.addEventListener('popstate', (e) => {
         const urlParams = new URLSearchParams(window.location.search);
         const cat = mapToSupermercado(urlParams.get('category'));
@@ -782,7 +797,7 @@ function loadProducts(category = null) {
 
         const supermercadoGroup = new Set(['supermercado', 'huevos', 'granos', 'aceites', 'pastas', 'verduras', 'farmacia', 'farmacias']);
 
-        // Usar remoteProducts si está disponible, si no, fallback a getAllProductsCombined
+    // Usar remoteProducts si está disponible, si no, usar alternativa getAllProductsCombined
         let all = [];
         if (typeof remoteProducts !== 'undefined' && Array.isArray(remoteProducts) && remoteProducts.length > 0) {
             all = remoteProducts;
@@ -1066,105 +1081,26 @@ function renderProductDetail() {
         return;
     }
 
-    let product = getAllProductsCombined().find(p => Number(p.id) === id);
-
-    if (!product) {
-        container.innerHTML = `
-            <div class="not-found">
-                <h3>Producto no encontrado</h3>
-                <p>No existe un producto con id ${id}. <a href="products.php">Ver productos</a></p>
-            </div>
-        `;
+    // Si el servidor ya renderizó el detalle del producto (salida PHP presente), no sobrescribirlo.
+    // Detect by checking if the container already has non-trivial content.
+    const hasServerRenderedContent = container.children.length > 0 && container.textContent.replace(/\s+/g, '').length > 20;
+    if (hasServerRenderedContent) {
+        // Attach add-to-cart handler to any server-rendered add button if present
+        const existingAdd = container.querySelector('.add-to-cart');
+        if (existingAdd) {
+            existingAdd.addEventListener('click', (e) => {
+                const pid = parseInt(existingAdd.dataset.id || idParam, 10);
+                if (!isNaN(pid)) {
+                    addToCart(pid);
+                    showNotification('Producto agregado al carrito');
+                }
+            });
+        }
         return;
     }
 
-    const priceHtml = (product.originalPrice && product.originalPrice > product.price)
-        ? `<div class="product-price"><span class="price">$${product.price.toFixed(2)}</span> <span class="original">$${product.originalPrice.toFixed(2)}</span></div>`
-        : `<div class="product-price"><span class="price">$${product.price.toFixed(2)}</span></div>`;
-
-    container.innerHTML = `
-        <div class="product-detail-card">
-            <div class="detail-grid">
-                <div class="detail-image">
-                    <img src="${product.image}" alt="${product.name}">
-                </div>
-                <div class="detail-info">
-                    <h2 class="detail-title">${product.name}</h2>
-                    <div class="detail-rating">${generateRatingStars(product.rating)} <span class="rating-number">${product.rating ?? ''}</span></div>
-                    ${priceHtml}
-                    <p class="detail-description">${product.description ?? ''}</p>
-                    <div class="detail-actions">
-                        <button class="add-to-cart btn" data-id="${product.id}"><i class="fas fa-cart-plus"></i> Agregar al carrito</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    // Permitir que el botón use la misma lógica que la lista para agregar al carrito
-    const addBtn = container.querySelector('.add-to-cart');
-    if (addBtn) {
-        addBtn.addEventListener('click', () => {
-            const pid = parseInt(addBtn.dataset.id, 10);
-            addToCart(pid);
-            // Pequeña animación/feedback
-            showNotification(`${product.name} agregado al carrito`);
-        });
-    }
-
-    // Safety: force layout styles in case CSS is being overridden in the environment
-    const grid = container.querySelector('.detail-grid');
-    const imgWrap = container.querySelector('.detail-image');
-    const info = container.querySelector('.detail-info');
-    const imgEl = container.querySelector('.detail-image img');
-
-    if (grid) {
-        grid.style.display = 'flex';
-        grid.style.gap = '24px';
-        grid.style.alignItems = 'flex-start';
-    }
-
-    if (imgWrap) {
-        imgWrap.style.flex = '0 0 45%';
-        imgWrap.style.maxWidth = '45%';
-    }
-
-    if (info) {
-        info.style.flex = '1 1 55%';
-    }
-
-    if (imgEl) {
-        imgEl.style.width = '100%';
-        imgEl.style.height = '100%';
-        imgEl.style.objectFit = 'cover';
-        imgEl.style.display = 'block';
-        imgEl.style.maxHeight = '420px';
-    }
-
-    // Ensure the .detail-info column matches the rendered image height so content can be centered
-    const infoCol = container.querySelector('.detail-info');
-    if (imgEl && infoCol) {
-        const applyHeight = () => {
-            // offsetHeight includes padding/border; use that to match visual height
-            const h = imgEl.offsetHeight;
-            if (h && h > 0) {
-                infoCol.style.minHeight = h + 'px';
-                // make sure vertical centering applies
-                infoCol.style.display = 'flex';
-                infoCol.style.flexDirection = 'column';
-                infoCol.style.justifyContent = 'center';
-            }
-        };
-
-        if (imgEl.complete) {
-            // image already loaded
-            applyHeight();
-        } else {
-            imgEl.addEventListener('load', applyHeight);
-            // also guard against slow layout changes
-            setTimeout(applyHeight, 300);
-        }
-    }
+    // Durante la prueba, evitar cualquier render cliente para no interferir con PHP
+    return;
 }
 
 
@@ -1389,7 +1325,7 @@ function initSearch() {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => {
             const searchTerm = e.target.value;
-            // If we're not on products.php, call the API and render results client-side
+            // Si no estamos en products.php, llamar a la API y mostrar resultados en el cliente
             if (!window.location.pathname.includes('products.php')) {
                 apiSearchAndDisplay(searchTerm);
                 return;
@@ -1429,6 +1365,11 @@ function initSearch() {
 
 
 // Loader helpers (subtle spinner when switching categories)
+/**
+ * Asegura que exista el elemento global del loader en el DOM.
+ * Crea y lo añade al <body> si no existe.
+ * No devuelve nada.
+ */
 function ensureLoaderExists() {
     if (document.getElementById('global-loader')) return;
     const overlay = document.createElement('div');
@@ -1438,18 +1379,25 @@ function ensureLoaderExists() {
     document.body.appendChild(overlay);
 }
 
+/**
+ * Muestra el loader global (añadiendo la clase 'active').
+ * Asegura la existencia del loader antes de activarlo.
+ */
 function showLoader() {
     ensureLoaderExists();
     const el = document.getElementById('global-loader');
     if (el) el.classList.add('active');
 }
 
+/**
+ * Oculta el loader global (remueve la clase 'active').
+ */
 function hideLoader() {
     const el = document.getElementById('global-loader');
     if (el) el.classList.remove('active');
 }
 
-// Preselect country-code based on browser locale (no flag icons)
+// Preseleccionar el código de país según la configuración regional del navegador (sin iconos de banderas)
 document.addEventListener('DOMContentLoaded', () => {
     const countrySelect = document.getElementById('country-code');
     if (!countrySelect) return;
