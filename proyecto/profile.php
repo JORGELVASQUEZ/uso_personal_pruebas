@@ -224,7 +224,7 @@ try {
                                 $del->execute(['vendedor_phone' => $identifier]);
 
                                 if (!empty($normalizedProducts)) {
-                                    $ins = $pdo->prepare('INSERT INTO productos (vendedor_phone, nombre, imagen, precio, descripcion, descuento_activo, precio_descuento) VALUES (:vendedor_phone, :nombre, :imagen, :precio, :descripcion, :descuento_activo, :precio_descuento)');
+                                    $ins = $pdo->prepare('INSERT INTO productos (vendedor_phone, nombre, imagen, precio, descripcion, categoria, descuento_activo, precio_descuento) VALUES (:vendedor_phone, :nombre, :imagen, :precio, :descripcion, :categoria, :descuento_activo, :precio_descuento)');
                                     foreach ($normalizedProducts as $p) {
                                         $ins->execute([
                                             'vendedor_phone' => $identifier,
@@ -232,6 +232,7 @@ try {
                                             'imagen' => $p['image'] ?? null,
                                             'precio' => $p['price'] !== null ? (float) $p['price'] : 0.0,
                                             'descripcion' => null,
+                                            'categoria' => null,
                                             'descuento_activo' => 0,
                                             'precio_descuento' => null,
                                         ]);
@@ -726,10 +727,23 @@ try {
                                     <input type="text" id="pm-image" placeholder="URL imagen (opcional)" class="form-control" />
                                     <input type="file" id="pm-image-file" accept="image/*">
                                     <img id="pm-image-preview" src="" alt="" />
-                                    <textarea id="pm-desc" placeholder="Descripción" class="form-control" rows="3"></textarea>
+                                        <textarea id="pm-desc" placeholder="Descripción" class="form-control" rows="3"></textarea>
+                                        <label for="pm-category" style="margin-top:8px; display:block;">Categoría</label>
+                                        <select id="pm-category" class="form-control">
+                                            <option value="">-- Seleccionar categoría --</option>
+                                            <option value="supermercado">Supermercado</option>
+                                            <option value="bebidas">Bebidas</option>
+                                            <option value="lacteos">Lácteos</option>
+                                            <option value="snacks">Snacks</option>
+                                            <option value="otros">Otros</option>
+                                        </select>
                                 </div>
                                 <div class="pm-right">
                                     <input type="number" id="pm-price" placeholder="Precio" class="form-control pm-price" step="0.01">
+                                        <div style="margin-top:8px;">
+                                            <label><input type="checkbox" id="pm-discount-active"> Tiene descuento</label>
+                                            <input type="number" id="pm-discount-price" placeholder="Precio descuento" class="form-control" step="0.01" style="margin-top:6px; display:none;" />
+                                        </div>
                                     <div class="pm-actions">
                                         <button type="button" id="pm-create-btn" class="btn pm-create">Crear producto</button>
                                         <button type="button" id="pm-clear-btn" class="btn pm-clear">Limpiar</button>
@@ -808,6 +822,21 @@ try {
                                 <input type="file" class="pm-input pm-image-file" accept="image/*">
                             </div>
                             <div class="pm-row">
+                                <label style="display:block; margin-bottom:6px;">Categoría</label>
+                                <select class="pm-input pm-category">
+                                    <option value="">-- Seleccionar --</option>
+                                    <option value="supermercado">Supermercado</option>
+                                    <option value="bebidas">Bebidas</option>
+                                    <option value="lacteos">Lácteos</option>
+                                    <option value="snacks">Snacks</option>
+                                    <option value="otros">Otros</option>
+                                </select>
+                            </div>
+                            <div class="pm-row">
+                                <label><input type="checkbox" class="pm-discount-active"> Tiene descuento</label>
+                                <input type="number" class="pm-input pm-discount-price" placeholder="Precio descuento" step="0.01" style="display:none; margin-left:8px;" />
+                            </div>
+                            <div class="pm-row">
                                 <textarea class="pm-input pm-desc" placeholder="Descripción" rows="2">${escapeHtml(p.descripcion || p.description || '')}</textarea>
                             </div>
                             <div class="pm-actions">
@@ -839,6 +868,30 @@ try {
                     });
                 }
 
+                // set category + discount fields initial state
+                const catSelect = node.querySelector('.pm-category');
+                if (catSelect) {
+                    const raw = (p.categoria || p.categoria_name || p.category || '') + '';
+                    const val = String(raw || '').toLowerCase();
+                    for (let i = 0; i < catSelect.options.length; i++) {
+                        const opt = (catSelect.options[i].value || '').toLowerCase();
+                        if (opt === val) { catSelect.selectedIndex = i; break; }
+                    }
+                }
+                const discountChk = node.querySelector('.pm-discount-active');
+                const discountPriceInput = node.querySelector('.pm-discount-price');
+                if (discountChk) {
+                    const active = Number(p.descuento_activo || p.discount_active || 0) === 1;
+                    discountChk.checked = active;
+                    if (discountPriceInput) {
+                        discountPriceInput.style.display = active ? 'inline-block' : 'none';
+                        discountPriceInput.value = p.precio_descuento != null ? String(p.precio_descuento) : '';
+                    }
+                    discountChk.addEventListener('change', function(){
+                        if (discountPriceInput) discountPriceInput.style.display = discountChk.checked ? 'inline-block' : 'none';
+                    });
+                }
+
                 // wire buttons
                 node.querySelector('.pm-save').addEventListener('click', async () => {
                     const name = node.querySelector('.pm-name').value.trim();
@@ -846,6 +899,9 @@ try {
                     const image = node.querySelector('.pm-image').value.trim();
                     const newFile = node.querySelector('.pm-image-file') && node.querySelector('.pm-image-file').files && node.querySelector('.pm-image-file').files[0];
                     const desc = node.querySelector('.pm-desc').value.trim();
+                    const categoria = node.querySelector('.pm-category') ? node.querySelector('.pm-category').value : '';
+                    const descuentoActivo = node.querySelector('.pm-discount-active') ? (node.querySelector('.pm-discount-active').checked ? 1 : 0) : 0;
+                    const precioDescuento = node.querySelector('.pm-discount-price') ? node.querySelector('.pm-discount-price').value : '';
 
                     if (!name) { showNotification('Nombre requerido', 'warning'); return; }
                     if (price === '' || isNaN(Number(price))) { showNotification('Precio inválido', 'warning'); return; }
@@ -860,7 +916,7 @@ try {
 
                         if (p.id) {
                             // update
-                            const body = { id: p.id, nombre: name, precio: price, imagen: finalImage, descripcion: desc };
+                            const body = { id: p.id, nombre: name, precio: price, imagen: finalImage, descripcion: desc, categoria: categoria, descuento_activo: descuentoActivo, precio_descuento: precioDescuento };
                             const res = await apiRequest('products.update', body, 'POST');
                             if (res.success) {
                                 showNotification('Producto actualizado');
@@ -870,7 +926,7 @@ try {
                             }
                         } else {
                             // create
-                            const body = { nombre: name, precio: price, imagen: finalImage, descripcion: desc };
+                            const body = { nombre: name, precio: price, imagen: finalImage, descripcion: desc, categoria: categoria, descuento_activo: descuentoActivo, precio_descuento: precioDescuento };
                             const res = await apiRequest('products.create', body, 'POST');
                             if (res.success) {
                                 showNotification('Producto creado');
@@ -942,6 +998,9 @@ try {
             const fileInput = document.getElementById('pm-image-file');
             const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
             const desc = document.getElementById('pm-desc').value.trim();
+            const categoria = document.getElementById('pm-category') ? document.getElementById('pm-category').value : '';
+            const descuentoActivo = document.getElementById('pm-discount-active') ? (document.getElementById('pm-discount-active').checked ? 1 : 0) : 0;
+            const precioDescuento = document.getElementById('pm-discount-price') ? document.getElementById('pm-discount-price').value : '';
 
             if (!name) { showNotification('Nombre requerido', 'warning'); return; }
             if (price === '' || isNaN(Number(price))) { showNotification('Precio inválido', 'warning'); return; }
@@ -951,7 +1010,7 @@ try {
                     finalImage = await uploadImage(file);
                 }
 
-                const body = { nombre: name, precio: price, imagen: finalImage, descripcion: desc };
+                const body = { nombre: name, precio: price, imagen: finalImage, descripcion: desc, categoria: categoria, descuento_activo: descuentoActivo, precio_descuento: precioDescuento };
                 const res = await apiRequest('products.create', body, 'POST');
                 if (res.success) {
                     document.getElementById('pm-name').value = '';
@@ -959,6 +1018,9 @@ try {
                     document.getElementById('pm-image').value = '';
                     document.getElementById('pm-image-file').value = '';
                     document.getElementById('pm-desc').value = '';
+                    if (document.getElementById('pm-category')) document.getElementById('pm-category').selectedIndex = 0;
+                    if (document.getElementById('pm-discount-active')) { document.getElementById('pm-discount-active').checked = false; }
+                    if (document.getElementById('pm-discount-price')) { document.getElementById('pm-discount-price').value = ''; document.getElementById('pm-discount-price').style.display = 'none'; }
                     const preview = document.getElementById('pm-image-preview');
                     if (preview) { preview.style.display = 'none'; preview.src = ''; }
                     showNotification('Producto creado');
@@ -970,6 +1032,17 @@ try {
                 showNotification(err.message || 'Error al subir imagen', 'error');
             }
         });
+
+        // toggle discount price input visibility on create form
+        const pmDiscountChk = document.getElementById('pm-discount-active');
+        const pmDiscountPrice = document.getElementById('pm-discount-price');
+        if (pmDiscountChk && pmDiscountPrice) {
+            pmDiscountChk.addEventListener('change', function(){
+                pmDiscountPrice.style.display = pmDiscountChk.checked ? 'inline-block' : 'none';
+            });
+            // initialize visibility
+            pmDiscountPrice.style.display = pmDiscountChk.checked ? 'inline-block' : 'none';
+        }
 
         document.getElementById('pm-clear-btn').addEventListener('click', function(){
             document.getElementById('pm-name').value = '';

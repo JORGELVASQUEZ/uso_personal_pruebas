@@ -1,5 +1,7 @@
 <?php
 // Página convertida desde index.html
+// Mantener la misma lógica de categorías que en products.php
+$category = isset($_GET['category']) ? $_GET['category'] : '';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -44,12 +46,12 @@
             
             <div class="header-bottom">
                 <ul class="categories">
-                    <li><a href="products.php" class="active">Todos</a></li>
-                    <li><a href="products.php?category=supermercado">Supermercado</a></li>
-                    <li><a href="products.php?category=bebidas">Bebidas</a></li>
-                    <li><a href="products.php?category=lacteos">Lácteos</a></li>
-                    <li><a href="products.php?category=snacks">Snacks</a></li>
-                    
+                    <li><a href="products.php" class="<?php echo empty($category) ? 'active' : ''; ?>">Todos</a></li>
+                    <li><a href="products.php?category=supermercado" class="<?php echo ($category === 'supermercado') ? 'active' : ''; ?>">Supermercado</a></li>
+                    <li><a href="products.php?category=bebidas" class="<?php echo ($category === 'bebidas') ? 'active' : ''; ?>">Bebidas</a></li>
+                    <li><a href="products.php?category=lacteos" class="<?php echo ($category === 'lacteos') ? 'active' : ''; ?>">Lácteos</a></li>
+                    <li><a href="products.php?category=snacks" class="<?php echo ($category === 'snacks') ? 'active' : ''; ?>">Snacks</a></li>
+                    <li><a href="products.php?category=descuentos" class="<?php echo ($category === 'descuentos') ? 'active' : ''; ?>">Descuentos</a></li>
                 </ul>
             </div>
         </div>
@@ -87,7 +89,7 @@
     <section class="container">
         <div class="section-title">
             <h3>Ofertas Especiales</h3>
-            <a href="products.php" class="view-all">Ver todas</a>
+            <a href="products.php?category=descuentos" class="view-all">Ver todas</a>
         </div>
         
         <div class="products-grid" id="offers-container">

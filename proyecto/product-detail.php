@@ -10,9 +10,9 @@ if ($id > 0) {
             PDO::ATTR_EMULATE_PREPARES => false,
         ]);
 
-        $stmt = $pdo->prepare('SELECT p.*, v.store_name AS seller_name, v.store_image AS seller_image FROM productos p LEFT JOIN vendedor v ON p.vendedor_phone = v.numero_telefono WHERE p.id = :id LIMIT 1');
-        $stmt->execute(['id' => $id]);
-        $product = $stmt->fetch();
+    $stmt = $pdo->prepare('SELECT * FROM productos WHERE id = :id LIMIT 1');
+    $stmt->execute(['id' => $id]);
+    $product = $stmt->fetch();
     } catch (Throwable $e) {
         $product = null;
     }
@@ -70,29 +70,41 @@ if ($id > 0) {
         </div>
     </header>
 
+    <!-- var_dump eliminado: depuración finalizada -->
     <main class="container">
         <div id="product-detail" class="product-detail">
             <?php if ($product): ?>
-                <div class="product-detail-card">
-                    <div class="detail-image"><img src="<?php echo htmlspecialchars($product['imagen'] ?: $product['seller_image'] ?: ''); ?>" alt="<?php echo htmlspecialchars($product['nombre']); ?>"></div>
+                <div class="product-detail-card detail-grid">
+                    <div class="detail-image">
+                        <img src="<?php echo htmlspecialchars($product['imagen'] ?: $product['seller_image'] ?: ''); ?>" alt="<?php echo htmlspecialchars($product['nombre']); ?>">
+                    </div>
                     <div class="detail-info">
-                        <h2><?php echo htmlspecialchars($product['nombre']); ?></h2>
-                        <div class="detail-price">
-                            <?php if (!empty($product['descuento_activo'])): ?>
+                        <h2 class="detail-title" style="color:#2196f3;font-size:2rem;margin-bottom:10px;"><?php echo htmlspecialchars($product['nombre']); ?></h2>
+                        <div class="detail-rating" style="margin-bottom:8px;">
+                            <i class="fas fa-star"></i> 4.5
+                        </div>
+                        <div class="detail-price" style="margin-bottom:8px;">
+                            <?php if (!empty($product['descuento_activo']) && $product['descuento_activo']): ?>
                                 <span class="price-discount">$<?php echo number_format((float)$product['precio_descuento'], 2); ?></span>
                                 <span class="price-original">$<?php echo number_format((float)$product['precio'], 2); ?></span>
+                                <span class="discount-label">Descuento</span>
                             <?php else: ?>
                                 <span class="price">$<?php echo number_format((float)$product['precio'], 2); ?></span>
                             <?php endif; ?>
                         </div>
-                        <p class="detail-description"><?php echo nl2br(htmlspecialchars($product['descripcion'] ?? '')); ?></p>
-                        <?php if (!empty($product['seller_name'])): ?>
-                            <div class="detail-seller">Vendido por: <?php echo htmlspecialchars($product['seller_name']); ?></div>
-                        <?php endif; ?>
+                        <div class="detail-category" style="margin-bottom:8px;">
+                            <span class="category-label">Categoría: <?php echo isset($product['categoria']) ? htmlspecialchars(ucfirst($product['categoria'])) : 'No definida'; ?></span>
+                        </div>
+                        <p class="detail-description" style="margin-bottom:18px; color:#6C757D;">
+                            <?php echo nl2br(htmlspecialchars($product['descripcion'] ?? '')); ?>
+                        </p>
+                        <button id="add-to-cart-btn" class="btn" style="background:#2196f3;color:#fff;padding:12px 18px;font-weight:600;font-size:1.1em;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;">
+                            <i class="fas fa-shopping-cart"></i> Agregar al carrito
+                        </button>
                     </div>
                 </div>
             <?php else: ?>
-                <!-- Si no se encontró producto en BD, main.js puede manejar la renderización desde su array local -->
+                <div style="padding:40px;text-align:center;color:#888;">No se encontró el producto.</div>
             <?php endif; ?>
         </div>
     </main>
@@ -112,5 +124,19 @@ if ($id > 0) {
     </aside>
 
     <script src="js/main.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var btn = document.getElementById('add-to-cart-btn');
+        if (btn) {
+            btn.addEventListener('click', function() {
+                if (typeof addToCart === 'function') {
+                    addToCart(<?php echo json_encode($product['id']); ?>);
+                } else {
+                    alert('No se pudo agregar al carrito.');
+                }
+            });
+        }
+    });
+    </script>
 </body>
 </html>

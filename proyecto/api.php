@@ -159,6 +159,7 @@ function bootstrapSchema(PDO $pdo): void
             imagen TEXT NULL,
             precio DECIMAL(10,2) NOT NULL DEFAULT 0.00,
             descripcion TEXT NULL,
+            categoria VARCHAR(100) NULL,
             descuento_activo TINYINT(1) DEFAULT 0,
             precio_descuento DECIMAL(10,2) NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -166,6 +167,18 @@ function bootstrapSchema(PDO $pdo): void
             CONSTRAINT fk_productos_vendedor FOREIGN KEY (vendedor_phone) REFERENCES vendedor(numero_telefono) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
     );
+
+    // Ensure 'categoria' column exists for backwards-compatibility with older schemas
+    $colCheck = $pdo->prepare("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'productos' AND COLUMN_NAME = 'categoria'");
+    $colCheck->execute();
+    $hasCategoria = (bool) $colCheck->fetchColumn();
+    if (!$hasCategoria) {
+        try {
+            $pdo->exec("ALTER TABLE productos ADD COLUMN categoria VARCHAR(100) NULL AFTER descripcion");
+        } catch (Throwable $_) {
+            // ignore if cannot alter (possible permission issues) — API will continue without categoria
+        }
+    }
 }
 
 /**
@@ -741,7 +754,8 @@ try {
                 $vendedorPhone = $digits; // keep as string (MySQL will cast) to avoid overflow
             }
         }
-        $limit = isset($params['limit']) ? (int)$params['limit'] : 50;
+    $limit = isset($params['limit']) ? (int)$params['limit'] : 50;
+    $search = isset($params['search']) ? trim((string)$params['search']) : '';
 
         // Build vendor fields dynamically to be compatible with older schemas that may lack new columns
         $vendorColsStmt = $pdo->prepare("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'vendedor' AND COLUMN_NAME IN ('store_name','store_image')");
@@ -760,6 +774,15 @@ try {
         if ($vendedorPhone !== null && $vendedorPhone > 0) {
             $conds[] = 'p.vendedor_phone = :vendedor_phone';
             $bind['vendedor_phone'] = $vendedorPhone;
+        }
+
+        if ($search !== '') {
+            // Add server-side search across nombre, descripcion and categoria
+            // Use distinct placeholders to avoid binding issues
+            $conds[] = "(p.nombre LIKE :s_nombre OR p.descripcion LIKE :s_descripcion OR p.categoria LIKE :s_categoria)";
+            $bind['s_nombre'] = '%' . $search . '%';
+            $bind['s_descripcion'] = '%' . $search . '%';
+            $bind['s_categoria'] = '%' . $search . '%';
         }
 
         if (!empty($conds)) {
@@ -813,19 +836,25 @@ try {
         $precio = isset($body['precio']) ? (float)$body['precio'] : 0.0;
         $descripcion = isset($body['descripcion']) ? trim((string)$body['descripcion']) : '';
         $descuento_activo = isset($body['descuento_activo']) && ($body['descuento_activo'] === '1' || $body['descuento_activo'] === 'true' || $body['descuento_activo'] === 1) ? 1 : 0;
-        $precio_descuento = isset($body['precio_descuento']) ? (float)$body['precio_descuento'] : null;
+        // Treat empty string as NULL to avoid storing 0.0 when user leaves field empty
+        if (array_key_exists('precio_descuento', $body)) {
+            $precio_descuento = ($body['precio_descuento'] === '' || $body['precio_descuento'] === null) ? null : (float)$body['precio_descuento'];
+        } else {
+            $precio_descuento = null;
+        }
 
         if ($nombre === '') {
             jsonResponse(['success' => false, 'message' => 'Nombre requerido'], 422);
         }
 
-        $insert = $pdo->prepare('INSERT INTO productos (vendedor_phone, nombre, imagen, precio, descripcion, descuento_activo, precio_descuento) VALUES (:vendedor_phone, :nombre, :imagen, :precio, :descripcion, :descuento_activo, :precio_descuento)');
+        $insert = $pdo->prepare('INSERT INTO productos (vendedor_phone, nombre, imagen, precio, descripcion, categoria, descuento_activo, precio_descuento) VALUES (:vendedor_phone, :nombre, :imagen, :precio, :descripcion, :categoria, :descuento_activo, :precio_descuento)');
         $insert->execute([
             'vendedor_phone' => (int)$user['id'],
             'nombre' => $nombre,
             'imagen' => $imagen,
             'precio' => $precio,
             'descripcion' => $descripcion,
+            'categoria' => isset($body['categoria']) ? trim((string)$body['categoria']) : null,
             'descuento_activo' => $descuento_activo,
             'precio_descuento' => $precio_descuento,
         ]);
@@ -841,6 +870,17 @@ try {
         }
 
         $body = getRequestData();
+        // Diagnostic logging: record incoming data to help debug why categoria/precio_descuento may not persist
+        try {
+            $diagPath = __DIR__ . '/products_update.log';
+            $entry = date('c') . " | products.update called\n";
+            $entry .= "\
+_POST=" . json_encode($_POST, JSON_UNESCAPED_UNICODE) . "\n";
+            $entry .= "BODY=" . json_encode($body, JSON_UNESCAPED_UNICODE) . "\n";
+            @file_put_contents($diagPath, $entry, FILE_APPEND | LOCK_EX);
+        } catch (Throwable $_) {
+            // ignore logging errors
+        }
         $id = isset($body['id']) ? (int)$body['id'] : 0;
         if ($id <= 0) {
             jsonResponse(['success' => false, 'message' => 'ID inválido'], 422);
@@ -862,7 +902,8 @@ try {
         if (isset($body['nombre'])) { $fields[] = 'nombre = :nombre'; $bind['nombre'] = trim((string)$body['nombre']); }
         if (isset($body['imagen'])) { $fields[] = 'imagen = :imagen'; $bind['imagen'] = trim((string)$body['imagen']); }
         if (isset($body['precio'])) { $fields[] = 'precio = :precio'; $bind['precio'] = (float)$body['precio']; }
-        if (isset($body['descripcion'])) { $fields[] = 'descripcion = :descripcion'; $bind['descripcion'] = trim((string)$body['descripcion']); }
+    if (isset($body['descripcion'])) { $fields[] = 'descripcion = :descripcion'; $bind['descripcion'] = trim((string)$body['descripcion']); }
+    if (isset($body['categoria'])) { $fields[] = 'categoria = :categoria'; $bind['categoria'] = $body['categoria'] === '' ? null : trim((string)$body['categoria']); }
         if (isset($body['descuento_activo'])) { $fields[] = 'descuento_activo = :descuento_activo'; $bind['descuento_activo'] = ($body['descuento_activo'] === '1' || $body['descuento_activo'] === 'true' || $body['descuento_activo'] === 1) ? 1 : 0; }
         if (array_key_exists('precio_descuento', $body)) { $fields[] = 'precio_descuento = :precio_descuento'; $bind['precio_descuento'] = $body['precio_descuento'] === '' ? null : (float)$body['precio_descuento']; }
 
@@ -872,6 +913,17 @@ try {
 
         $sql = 'UPDATE productos SET ' . implode(', ', $fields) . ' WHERE id = :id';
         $stmt = $pdo->prepare($sql);
+        // Diagnostic: log SQL and bind values to help debug persistence issues
+        try {
+            $diagPath = __DIR__ . '/products_update.log';
+            $entry = date('c') . " | about to execute UPDATE\n";
+            $entry .= "SQL=" . $sql . "\n";
+            $entry .= "BIND=" . json_encode($bind, JSON_UNESCAPED_UNICODE) . "\n\n";
+            @file_put_contents($diagPath, $entry, FILE_APPEND | LOCK_EX);
+        } catch (Throwable $_) {
+            // ignore logging failures
+        }
+
         $stmt->execute($bind);
 
         jsonResponse(['success' => true]);

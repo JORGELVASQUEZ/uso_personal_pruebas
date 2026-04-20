@@ -10,19 +10,16 @@ const products = [
     { id: 8, name: "Tomates 1kg", price: 2.40, image: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Verduras", rating: 4.1, description: "Tomates frescos y jugosos, cultivados localmente." }
 ];
 
-// Productos remotos cargados desde la API (tabla `productos`). Se fusionan con `products` al renderizar.
 let remoteProducts = [];
 
-// Datos de ofertas
-const offers = [
-    { id: 9, name: "Coca-Cola 2L", price: 2.20, originalPrice: 2.80, image: "https://images.unsplash.com/photo-1554866585-cd94860890b7?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Bebidas", rating: 4.8, description: "Refresco Coca-Cola original en presentación familiar." },
-    { id: 10, name: "Papas Fritas 200g", price: 1.90, originalPrice: 2.50, image: "https://images.unsplash.com/photo-1566478989037-eec170784d0b?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Snacks", rating: 4.5, description: "Papas fritas crujientes con sabor natural." },
-    { id: 11, name: "Chocolate 100g", price: 1.50, originalPrice: 2.00, image: "https://perfectdailygrind.com/es/wp-content/uploads/sites/2/2020/04/Hs_5Ce8ecmXodh-AdEVHyT07irPaZ-zAAhYkKYRJgS5CVzHKs0cAAdyeAF9TIgyh4KI5gqYmyuIDwJnf2f9wCdNvJ5WbQOlSoRr5zmmzMalyR1-RQxvlOtTZkJq9G_GPUiVZ6_WX-1.jpeg", category: "Snacks", rating: 4.7, description: "Chocolate con leche de alta calidad." },
-    { id: 12, name: "Galletas Integrales", price: 1.30, originalPrice: 1.80, image: "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60", category: "Snacks", rating: 4.3, description: "Galletas integrales con avena y miel." }
-];
+
 
 // Carrito de compras
 let cart = [];
+
+// Nota: el render del detalle de producto se maneja por JS (renderProductDetail)
+// Anteriormente había un override aquí para desactivar el render durante depuración PHP;
+// lo hemos eliminado para mantener el comportamiento consistente.
 
 // Usuario actual
 let currentUser = null;
@@ -49,6 +46,7 @@ function appendFormValue(params, key, value) {
     }
 
     params.append(key, value ?? '');
+
 }
 
 /**
@@ -59,6 +57,7 @@ function appendFormValue(params, key, value) {
 function isValidTenDigits(phone) {
     const digits = String(phone).replace(/\D/g, '');
     return digits.length === 10;
+
 }
 
 /**
@@ -93,6 +92,7 @@ async function apiRequest(action, body = null, method = 'POST') {
     }
 
     return data;
+
 }
 
 /**
@@ -103,6 +103,7 @@ async function persistCart() {
     if (!response.success) {
         showNotification('No se pudo sincronizar el carrito', 'warning');
     }
+
 }
 
 // Inicializar datos
@@ -120,6 +121,7 @@ async function initData() {
     cart = Array.isArray(response.cart) ? response.cart : [];
     currentUser = response.user || null;
     updateUserUI();
+
 }
 
 /**
@@ -131,25 +133,17 @@ async function fetchRemoteProducts(limit = 100) {
         const res = await fetch(`api.php?action=products.list&limit=${encodeURIComponent(limit)}`);
         const data = await res.json();
         if (res.ok && data && data.success && Array.isArray(data.products)) {
-            // Mapear a la forma esperada por el render (name, image, id, price, description)
-            remoteProducts = data.products.map(p => ({
-                id: Number(p.id),
-                name: p.nombre || p.name || '',
-                image: p.imagen || p.image || p.seller_image || '',
-                price: typeof p.precio !== 'undefined' ? Number(p.precio) : (p.price ? Number(p.price) : 0),
-                description: p.descripcion || p.description || '',
-                rating: p.rating ? Number(p.rating) : 4.5,
-                originalPrice: p.precio_descuento ? Number(p.precio) : undefined,
-            }));
+            // Mapear a la forma esperada por el render (name, image, id, price, description, descuento_activo, precio_descuento)
+                // Normalizar cada fila con el helper centralizado
+                remoteProducts = data.products.map(mapApiProduct);
         } else {
             remoteProducts = [];
         }
     } catch (e) {
-        console.warn('No se pudieron cargar productos remotos:', e);
+        // Fallo silencioso al cargar remotos — usar fallback local
         remoteProducts = [];
     }
-}
-
+    }
 /**
  * Devuelve el conjunto de productos que deben renderizarse, combinando remotos + locales sin duplicados.
  */
@@ -165,6 +159,63 @@ function getAllProductsCombined() {
         }
     });
     return Array.from(map.values());
+}
+
+/**
+ * Map an API product row to the normalized shape used by the front-end.
+ * @param {object} p API product row
+ */
+function mapApiProduct(p) {
+    return {
+        id: Number(p.id),
+        nombre: p.nombre || p.name || '',
+        name: p.nombre || p.name || '',
+        imagen: p.imagen || p.image || p.seller_image || '',
+        image: p.imagen || p.image || p.seller_image || '',
+        precio: typeof p.precio !== 'undefined' ? Number(p.precio) : (p.price ? Number(p.price) : 0),
+        price: typeof p.precio !== 'undefined' ? Number(p.precio) : (p.price ? Number(p.price) : 0),
+        descripcion: p.descripcion || p.description || '',
+        description: p.descripcion || p.description || '',
+        rating: p.rating ? Number(p.rating) : 4.5,
+        categoria: p.categoria || p.category || '',
+        descuento_activo: p.descuento_activo === 1 || p.descuento_activo === '1' || p.descuento_activo === true || p.descuento_activo === 'true',
+        precio_descuento: typeof p.precio_descuento !== 'undefined' && p.precio_descuento !== null ? Number(p.precio_descuento) : null
+    };
+}
+
+/**
+ * Fetch products from the API using a search term and render results client-side.
+ * This allows searching from any page without navigating to products.php.
+ * @param {string} term
+ */
+async function apiSearchAndDisplay(term) {
+    if (!term || term.trim() === '') {
+        clearSearch();
+        return;
+    }
+
+    showLoader();
+    try {
+        const res = await fetch(`api.php?action=products.list&search=${encodeURIComponent(term)}&limit=100`);
+        const data = await res.json();
+        if (!res.ok || !data || !data.success || !Array.isArray(data.products)) {
+            showNotification('No se pudieron obtener resultados del servidor', 'warning');
+            hideLoader();
+            return;
+        }
+
+        const mapped = data.products.map(mapApiProduct);
+        const productsResult = mapped.filter(p => !p.descuento_activo);
+        const offersResult = mapped.filter(p => p.descuento_activo);
+
+        displaySearchResults(productsResult, offersResult, term);
+    } catch (e) {
+        // Registro mínimo en consola para depuración; no exponemos objetos grandes en prod
+        console.error('Search API error:', e && e.message ? e.message : String(e));
+        showNotification('Error al buscar productos', 'error');
+    } finally {
+        hideLoader();
+    }
 }
 
 // Generar estrellas de calificación
@@ -309,29 +360,34 @@ function updateCart() {
  * @param {number} productId Id del producto a añadir.
  */
 function addToCart(productId) {
-    // Buscar el producto en productos o ofertas
-    let product = products.find(p => p.id === productId);
-    if (!product) {
-        product = offers.find(p => p.id === productId);
+    // Buscar primero en remoteProducts (productos de la base de datos)
+    let product = null;
+    if (typeof remoteProducts !== 'undefined' && Array.isArray(remoteProducts)) {
+        product = remoteProducts.find(p => p.id === productId);
     }
-    
+    // Si no está en remoteProducts, buscar en products/ofertas
+    if (!product) {
+        product = products.find(p => p.id === productId);
+    }
+    if (!product) {
+        // Buscar en el conjunto combinado (remote + local) en lugar de usar una variable global `offers` que
+        // no siempre existe. Esto evita errores cuando `offers` no está definida.
+        product = getAllProductsCombined().find(p => Number(p.id) === productId);
+    }
     if (!product) return;
-    
     // Verificar si el producto ya está en el carrito
     const existingItem = cart.find(item => item.id === productId);
-    
     if (existingItem) {
         existingItem.quantity++;
     } else {
         cart.push({
             id: product.id,
             name: product.name,
-            price: product.price,
+            price: (typeof product.precio_descuento !== 'undefined' && product.precio_descuento && product.descuento_activo) ? Number(product.precio_descuento) : Number(product.price),
             image: product.image,
             quantity: 1
         });
     }
-    
     updateCart();
     showNotification(`${product.name} agregado al carrito`);
 }
@@ -568,20 +624,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Agregar funcionalidad a las categorías
     document.querySelectorAll('.categories a').forEach(link => {
         link.addEventListener('click', (e) => {
+            // Allow full navigation when clicking categories from the index (home).
+            // Only intercept clicks and do AJAX filtering when we're on products.php.
+            const href = link.getAttribute('href') || '';
+            const params = new URLSearchParams(href.split('?')[1] || '');
+            let categoryParam = params.get('category');
+
+            if (!window.location.pathname.includes('products.php')) {
+                // Not on products page — let the link navigate to products.php?category=...
+                return; // default browser navigation
+            }
+
             e.preventDefault();
-            
+
             // Remover clase active de todos los enlaces
             document.querySelectorAll('.categories a').forEach(item => {
                 item.classList.remove('active');
             });
-            
+
             // Agregar clase active al enlace clickeado
             link.classList.add('active');
-            
-                // Obtener category desde el href (si existe) y actualizar la URL sin recargar
-            const href = link.getAttribute('href') || '';
-            const params = new URLSearchParams(href.split('?')[1] || '');
-            let categoryParam = params.get('category');
+
             // si el enlace apuntaba a una subcategoría que ahora forma parte de supermercado,
             // normalizamos y la redirigimos a 'supermercado'
             const merged = ['huevos','granos','aceites','pastas','verduras','farmacia','farmacias'];
@@ -593,8 +656,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const newPath = categoryParam ? `products.php?category=${encodeURIComponent(categoryParam)}` : 'products.php';
             history.pushState({ category: categoryParam }, '', newPath);
 
-                // Recargar la lista filtrada (productos y ofertas) en un único contenedor sin duplicados
-                loadCombined(categoryParam);
+            // Recargar la lista filtrada (productos y ofertas) en un único contenedor sin duplicados
+            loadCombined(categoryParam);
 
             // No mostrar notificación al aplicar filtro (mostramos productos y ofertas juntos)
         });
@@ -719,38 +782,68 @@ function loadProducts(category = null) {
 
         const supermercadoGroup = new Set(['supermercado', 'huevos', 'granos', 'aceites', 'pastas', 'verduras', 'farmacia', 'farmacias']);
 
-        const all = getAllProductsCombined();
-        const filtered = all.filter(p => {
+        // Usar remoteProducts si está disponible, si no, fallback a getAllProductsCombined
+        let all = [];
+        if (typeof remoteProducts !== 'undefined' && Array.isArray(remoteProducts) && remoteProducts.length > 0) {
+            all = remoteProducts;
+        } else {
+            all = getAllProductsCombined();
+        }
+
+
+
+        // Filtrar SOLO productos que tengan descuento_activo = 0 (no están en oferta)
+        let filtered = all.filter(p => {
+            // Considerar 0, false, '0', 'false' como NO descuento
+            if (p.descuento_activo === 1 || p.descuento_activo === '1' || p.descuento_activo === true || p.descuento_activo === 'true') return false;
             if (!selected) return true;
-            const cat = normalize(p.category);
+            const cat = normalize(p.categoria || p.category);
             if (selected === 'supermercado') {
                 return supermercadoGroup.has(cat) || cat === selected;
             }
             return cat === selected;
         });
+
+        // Si no hay productos destacados, usar productos locales de demo SIEMPRE que existan
+        if (filtered.length === 0 && products.length > 0) {
+            filtered = products.filter(p => {
+                if (!selected) return true;
+                const cat = normalize(p.category);
+                if (selected === 'supermercado') {
+                    return supermercadoGroup.has(cat) || cat === selected;
+                }
+                return cat === selected;
+            });
+        }
+
+        if (filtered.length === 0) {
+            productsContainer.innerHTML = '<p style="grid-column: 1/-1; text-align: center; padding: 40px;">No hay productos destacados disponibles.</p>';
+            hideLoader();
+            return;
+        }
 
         // Renderizar productos filtrados
-    filtered.forEach(product => {
+        filtered.forEach(product => {
+            let priceHtml = `<div class="product-price">$${Number(product.precio || product.price).toFixed(2)}</div>`;
             const productCard = document.createElement('a');
             productCard.className = 'product-card';
             productCard.href = `product-detail.php?id=${product.id}`;
             productCard.innerHTML = `
                 <div class="product-image">
-                    <img src="${product.image}" alt="${product.name}">
+                    <img src="${product.imagen || product.image}" alt="${product.nombre || product.name}">
                 </div>
                 <div class="product-info">
-                    <h4 class="product-title">${product.name}</h4>
+                    <h4 class="product-title">${product.nombre || product.name}</h4>
                     <div class="product-rating">
-                        ${generateRatingStars(product.rating)}
-                        <span style="color: var(--gray-color); font-size: 0.9rem;">${product.rating}</span>
+                        ${generateRatingStars(product.rating || 4.5)}
+                        <span style="color: var(--gray-color); font-size: 0.9rem;">${product.rating || 4.5}</span>
                     </div>
-                    <div class="product-price">$${product.price.toFixed(2)}</div>
+                    ${priceHtml}
                     <button class="add-to-cart" data-id="${product.id}">
                         <i class="fas fa-cart-plus"></i> Agregar
                     </button>
                 </div>
             `;
-            
             // IMPORTANTE: Evitar que el clic en el botón navegue al enlace padre
             const addButton = productCard.querySelector('.add-to-cart');
             addButton.addEventListener('click', (e) => {
@@ -759,94 +852,11 @@ function loadProducts(category = null) {
                 const productId = parseInt(e.currentTarget.dataset.id);
                 addToCart(productId);
             });
-            
             productsContainer.appendChild(productCard);
         });
-
-        // NOTE: ofertas se muestran en su propia sección (loadOffers). No agregamos ofertas aquí.
-
-        setTimeout(hideLoader, 120);
+        hideLoader();
     }, 120);
-}
 
-// Cargar ofertas
-/**
- * Renderiza la sección de ofertas/descubiertos (productos con descuento).
- */
-function loadOffers(category = null) {
-    const offersContainer = document.getElementById('offers-container');
-    if (!offersContainer) return;
-
-    const normalize = (s) => {
-        if (!s) return '';
-        try {
-            return String(s).toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
-        } catch (e) {
-            return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-        }
-    };
-
-    const selected = category ? normalize(category) : null;
-
-    showLoader();
-
-    setTimeout(() => {
-        offersContainer.innerHTML = '';
-
-        const supermercadoGroup = new Set(['supermercado', 'huevos', 'granos', 'aceites', 'pastas', 'verduras', 'farmacia', 'farmacias']);
-
-        const filtered = offers.filter(p => {
-            if (!selected) return true;
-            const cat = normalize(p.category);
-            if (selected === 'supermercado') {
-                return supermercadoGroup.has(cat) || cat === selected;
-            }
-            return cat === selected;
-        });
-
-        filtered.forEach(product => {
-            const discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
-
-            const productCard = document.createElement('a');
-            productCard.className = 'product-card';
-            productCard.href = `product-detail.php?id=${product.id}`;
-            productCard.innerHTML = `
-                <div style="position: absolute; top: 10px; left: 10px; background-color: var(--primary-color); color: white; padding: 5px 10px; border-radius: 4px; font-weight: bold; z-index: 1;">
-                    -${discount}%
-                </div>
-                <div class="product-image">
-                    <img src="${product.image}" alt="${product.name}">
-                </div>
-                <div class="product-info">
-                    <h4 class="product-title">${product.name}</h4>
-                    <div class="product-rating">
-                        ${generateRatingStars(product.rating)}
-                        <span style="color: var(--gray-color); font-size: 0.9rem;">${product.rating}</span>
-                    </div>
-                    <div class="product-price">
-                        <span style="color: var(--primary-color); font-size: 1.3rem; font-weight: 700;">$${product.price.toFixed(2)}</span>
-                        <span style="color: var(--gray-color); text-decoration: line-through; margin-left: 5px; font-size: 1rem;">$${product.originalPrice.toFixed(2)}</span>
-                    </div>
-                    <button class="add-to-cart" data-id="${product.id}">
-                        <i class="fas fa-cart-plus"></i> Agregar
-                    </button>
-                </div>
-            `;
-            
-            // IMPORTANTE: Evitar que el clic en el botón navegue al enlace padre
-            const addButton = productCard.querySelector('.add-to-cart');
-            addButton.addEventListener('click', (e) => {
-                e.preventDefault();  // Evita comportamiento por defecto
-                e.stopPropagation();  // Detiene la propagación al elemento padre <a>
-                const productId = parseInt(e.currentTarget.dataset.id);
-                addToCart(productId);
-            });
-            
-            offersContainer.appendChild(productCard);
-        });
-
-        setTimeout(hideLoader, 120);
-    }, 120);
 }
 
 // Cargar productos y ofertas juntos sin duplicados
@@ -878,32 +888,47 @@ function loadCombined(category = null) {
         if (offersContainer) offersContainer.style.display = 'none';
 
         // Filtrar productos y ofertas por categoría
-        const filteredProducts = getAllProductsCombined().filter(p => {
-            if (!selected) return true;
-            const cat = normalize(p.category);
-            if (selected === 'supermercado') return supermercadoGroup.has(cat) || cat === selected;
-            return cat === selected;
-        });
-
-        const filteredOffers = offers.filter(p => {
-            if (!selected) return true;
-            const cat = normalize(p.category);
-            if (selected === 'supermercado') return supermercadoGroup.has(cat) || cat === selected;
-            return cat === selected;
-        });
+        // Productos normales (sin descuento activo)
+        let filteredProducts = [];
+        let filteredOffers = [];
+        if (typeof remoteProducts !== 'undefined' && Array.isArray(remoteProducts)) {
+            filteredProducts = remoteProducts.filter(p => {
+                if (p.descuento_activo) return false;
+                if (!selected) return true;
+                const cat = normalize(p.categoria || p.category);
+                if (selected === 'supermercado') return supermercadoGroup.has(cat) || cat === selected;
+                return cat === selected;
+            });
+            filteredOffers = remoteProducts.filter(p => {
+                if (!p.descuento_activo) return false;
+                if (!selected) return true;
+                const cat = normalize(p.categoria || p.category);
+                if (selected === 'supermercado') return supermercadoGroup.has(cat) || cat === selected;
+                return cat === selected;
+            });
+        } else {
+            filteredProducts = getAllProductsCombined().filter(p => {
+                if (p.descuento_activo) return false;
+                if (!selected) return true;
+                const cat = normalize(p.categoria || p.category);
+                if (selected === 'supermercado') return supermercadoGroup.has(cat) || cat === selected;
+                return cat === selected;
+            });
+            filteredOffers = [];
+        }
 
         // Unir manteniendo productos primero y evitando duplicados por id
         const seen = new Set();
         const combined = [];
 
-    filteredProducts.forEach(p => {
+        filteredProducts.forEach(p => {
             if (!seen.has(p.id)) {
                 seen.add(p.id);
                 combined.push({ item: p, isOffer: false });
             }
         });
 
-    filteredOffers.forEach(o => {
+        filteredOffers.forEach(o => {
             if (!seen.has(o.id)) {
                 seen.add(o.id);
                 combined.push({ item: o, isOffer: true });
@@ -955,17 +980,26 @@ function loadOffers(category = null) {
         // Same supermercado grouping for offers
         const supermercadoGroup = new Set(['supermercado', 'huevos', 'granos', 'aceites', 'pastas', 'verduras', 'farmacia', 'farmacias']);
 
-        const filtered = offers.filter(p => {
-            if (!selected) return true;
-            const cat = normalize(p.category);
-            if (selected === 'supermercado') {
-                return supermercadoGroup.has(cat) || cat === selected;
-            }
-            return cat === selected;
-        });
+
+        // Usar productos de la base de datos (remoteProducts) con descuento_activo = 1
+        let filtered = [];
+        if (typeof remoteProducts !== 'undefined' && Array.isArray(remoteProducts)) {
+            filtered = remoteProducts.filter(p => {
+                // Considerar 1, true, '1', 'true' como descuento activo
+                if (!(p.descuento_activo === 1 || p.descuento_activo === '1' || p.descuento_activo === true || p.descuento_activo === 'true')) return false;
+                if (!selected) return true;
+                const cat = normalize(p.categoria || p.category);
+                if (selected === 'supermercado') {
+                    return supermercadoGroup.has(cat) || cat === selected;
+                }
+                return cat === selected;
+            });
+        }
 
         filtered.forEach(product => {
-            const discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
+            const precio = Number(product.precio_descuento) || Number(product.precio) || Number(product.price);
+            const original = Number(product.precio) || Number(product.originalPrice) || precio;
+            const discount = original && precio && original > precio ? Math.round(((original - precio) / original) * 100) : 0;
 
             const productCard = document.createElement('a');
             productCard.className = 'product-card';
@@ -975,17 +1009,17 @@ function loadOffers(category = null) {
                     -${discount}%
                 </div>
                 <div class="product-image">
-                    <img src="${product.image}" alt="${product.name}">
+                    <img src="${product.imagen || product.image}" alt="${product.nombre || product.name}">
                 </div>
                 <div class="product-info">
-                    <h4 class="product-title">${product.name}</h4>
+                    <h4 class="product-title">${product.nombre || product.name}</h4>
                     <div class="product-rating">
-                        ${generateRatingStars(product.rating)}
-                        <span style="color: var(--gray-color); font-size: 0.9rem;">${product.rating}</span>
+                        ${generateRatingStars(product.rating || 4.5)}
+                        <span style="color: var(--gray-color); font-size: 0.9rem;">${product.rating || 4.5}</span>
                     </div>
                     <div class="product-price">
-                        <span style="color: var(--primary-color); font-size: 1.3rem; font-weight: 700;">$${product.price.toFixed(2)}</span>
-                        <span style="color: var(--gray-color); text-decoration: line-through; margin-left: 5px; font-size: 1rem;">$${product.originalPrice.toFixed(2)}</span>
+                        <span style="color: var(--primary-color); font-size: 1.3rem; font-weight: 700;">$${precio.toFixed(2)}</span>
+                        <span style="color: var(--gray-color); text-decoration: line-through; margin-left: 5px; font-size: 1rem;">$${original.toFixed(2)}</span>
                     </div>
                     <button class="add-to-cart" data-id="${product.id}">
                         <i class="fas fa-cart-plus"></i> Agregar
@@ -1032,7 +1066,7 @@ function renderProductDetail() {
         return;
     }
 
-    let product = getAllProductsCombined().find(p => Number(p.id) === id) || offers.find(p => p.id === id);
+    let product = getAllProductsCombined().find(p => Number(p.id) === id);
 
     if (!product) {
         container.innerHTML = `
@@ -1150,19 +1184,26 @@ function searchProducts(searchTerm) {
 
     const term = searchTerm.toLowerCase().trim();
     
-    // Filtrar productos normales
-    const filteredProducts = products.filter(product => 
-        product.name.toLowerCase().includes(term) ||
-        product.category.toLowerCase().includes(term) ||
-        (product.description && product.description.toLowerCase().includes(term))
-    );
-    
-    // Filtrar ofertas
-    const filteredOffers = offers.filter(offer => 
-        offer.name.toLowerCase().includes(term) ||
-        offer.category.toLowerCase().includes(term) ||
-        (offer.description && offer.description.toLowerCase().includes(term))
-    );
+    // Obtener todos los productos combinados (remotos + locales) y filtrar
+    const all = typeof getAllProductsCombined === 'function' ? getAllProductsCombined() : ([]);
+
+    const filteredProducts = all.filter(product => {
+        // excluir ofertas (descuento activo)
+        if (product.descuento_activo === 1 || product.descuento_activo === '1' || product.descuento_activo === true || product.descuento_activo === 'true') return false;
+        const name = (product.nombre || product.name || '').toString().toLowerCase();
+        const cat = (product.categoria || product.category || '').toString().toLowerCase();
+        const desc = (product.descripcion || product.description || '').toString().toLowerCase();
+        return name.includes(term) || cat.includes(term) || desc.includes(term);
+    });
+
+    // Filtrar ofertas (productos con descuento activo)
+    const filteredOffers = all.filter(product => {
+        if (!(product.descuento_activo === 1 || product.descuento_activo === '1' || product.descuento_activo === true || product.descuento_activo === 'true')) return false;
+        const name = (product.nombre || product.name || '').toString().toLowerCase();
+        const cat = (product.categoria || product.category || '').toString().toLowerCase();
+        const desc = (product.descripcion || product.description || '').toString().toLowerCase();
+        return name.includes(term) || cat.includes(term) || desc.includes(term);
+    });
     
     // Mostrar resultados
     displaySearchResults(filteredProducts, filteredOffers, term);
@@ -1249,12 +1290,14 @@ function createProductCard(product, isOffer = false) {
     productCard.href = `product-detail.php?id=${product.id}`;
     
     let priceHtml = '';
-    if (isOffer && product.originalPrice) {
-        const discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
+    // Si el producto tiene descuento_activo y precio_descuento, mostrar como oferta
+    const isDiscounted = (product.descuento_activo && Number(product.precio_descuento) < Number(product.precio));
+    if (isDiscounted) {
+        const discount = Math.round(((Number(product.precio) - Number(product.precio_descuento)) / Number(product.precio)) * 100);
         priceHtml = `
             <div class="product-price">
-                <span style="color: var(--primary-color); font-size: 1.3rem; font-weight: 700;">$${product.price.toFixed(2)}</span>
-                <span style="color: var(--gray-color); text-decoration: line-through; margin-left: 5px; font-size: 1rem;">$${product.originalPrice.toFixed(2)}</span>
+                <span style="color: var(--primary-color); font-size: 1.3rem; font-weight: 700;">$${Number(product.precio_descuento).toFixed(2)}</span>
+                <span style="color: var(--gray-color); text-decoration: line-through; margin-left: 5px; font-size: 1rem;">$${Number(product.precio).toFixed(2)}</span>
             </div>
         `;
         productCard.innerHTML = `
@@ -1262,13 +1305,13 @@ function createProductCard(product, isOffer = false) {
                 -${discount}%
             </div>
             <div class="product-image">
-                <img src="${product.image}" alt="${product.name}">
+                <img src="${product.imagen || product.image}" alt="${product.nombre || product.name}">
             </div>
             <div class="product-info">
-                <h4 class="product-title">${product.name}</h4>
+                <h4 class="product-title">${product.nombre || product.name}</h4>
                 <div class="product-rating">
-                    ${generateRatingStars(product.rating)}
-                    <span style="color: var(--gray-color); font-size: 0.9rem;">${product.rating}</span>
+                    ${generateRatingStars(product.rating || 4.5)}
+                    <span style="color: var(--gray-color); font-size: 0.9rem;">${product.rating || 4.5}</span>
                 </div>
                 ${priceHtml}
                 <button class="add-to-cart" data-id="${product.id}">
@@ -1277,16 +1320,16 @@ function createProductCard(product, isOffer = false) {
             </div>
         `;
     } else {
-        priceHtml = `<div class="product-price">$${product.price.toFixed(2)}</div>`;
+        priceHtml = `<div class="product-price">$${Number(product.precio || product.price).toFixed(2)}</div>`;
         productCard.innerHTML = `
             <div class="product-image">
-                <img src="${product.image}" alt="${product.name}">
+                <img src="${product.imagen || product.image}" alt="${product.nombre || product.name}">
             </div>
             <div class="product-info">
-                <h4 class="product-title">${product.name}</h4>
+                <h4 class="product-title">${product.nombre || product.name}</h4>
                 <div class="product-rating">
-                    ${generateRatingStars(product.rating)}
-                    <span style="color: var(--gray-color); font-size: 0.9rem;">${product.rating}</span>
+                    ${generateRatingStars(product.rating || 4.5)}
+                    <span style="color: var(--gray-color); font-size: 0.9rem;">${product.rating || 4.5}</span>
                 </div>
                 ${priceHtml}
                 <button class="add-to-cart" data-id="${product.id}">
@@ -1346,6 +1389,11 @@ function initSearch() {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => {
             const searchTerm = e.target.value;
+            // If we're not on products.php, call the API and render results client-side
+            if (!window.location.pathname.includes('products.php')) {
+                apiSearchAndDisplay(searchTerm);
+                return;
+            }
             searchProducts(searchTerm);
         }, 300); // Esperar 300ms después de que el usuario deje de escribir
     });
@@ -1354,6 +1402,10 @@ function initSearch() {
     if (searchIcon) {
         searchIcon.addEventListener('click', () => {
             const searchTerm = searchInput.value;
+            if (!window.location.pathname.includes('products.php')) {
+                apiSearchAndDisplay(searchTerm);
+                return;
+            }
             searchProducts(searchTerm);
         });
     }
@@ -1363,6 +1415,10 @@ function initSearch() {
         if (e.key === 'Enter') {
             e.preventDefault();
             const searchTerm = searchInput.value;
+            if (!window.location.pathname.includes('products.php')) {
+                apiSearchAndDisplay(searchTerm);
+                return;
+            }
             searchProducts(searchTerm);
         }
     });
