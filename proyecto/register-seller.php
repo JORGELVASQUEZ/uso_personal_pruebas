@@ -169,8 +169,27 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const registerForm = document.getElementById('register-seller-form');
-            
-                registerForm.addEventListener('submit', async function(e) {
+
+            // Forzar que el campo teléfono acepte solo dígitos mientras el usuario escribe o pega texto
+            const phoneInput = document.getElementById('phone');
+            if (phoneInput) {
+                phoneInput.addEventListener('input', function(e) {
+                    const cleaned = this.value.replace(/\D/g, '');
+                    if (this.value !== cleaned) this.value = cleaned;
+                });
+
+                phoneInput.addEventListener('paste', function(e) {
+                    e.preventDefault();
+                    const paste = (e.clipboardData || window.clipboardData).getData('text') || '';
+                    const digits = paste.replace(/\D/g, '');
+                    const start = this.selectionStart || 0;
+                    const end = this.selectionEnd || 0;
+                    const newValue = (this.value.slice(0, start) + digits + this.value.slice(end)).slice(0, this.maxLength || undefined);
+                    this.value = newValue.replace(/\D/g, '');
+                });
+            }
+
+            registerForm.addEventListener('submit', async function(e) {
                 e.preventDefault();
                 
                 const storeName = document.getElementById('store-name').value;

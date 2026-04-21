@@ -152,8 +152,30 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const registerForm = document.getElementById('register-form');
-            
-                registerForm.addEventListener('submit', async function(e) {
+
+            // Forzar que el campo teléfono acepte solo dígitos mientras el usuario escribe o pega texto
+            const phoneInput = document.getElementById('phone');
+            if (phoneInput) {
+                // Remover cualquier carácter no numérico en tiempo real
+                phoneInput.addEventListener('input', function(e) {
+                    const cleaned = this.value.replace(/\D/g, '');
+                    if (this.value !== cleaned) this.value = cleaned;
+                });
+
+                // Manejar pegado: insertar sólo dígitos
+                phoneInput.addEventListener('paste', function(e) {
+                    e.preventDefault();
+                    const paste = (e.clipboardData || window.clipboardData).getData('text') || '';
+                    const digits = paste.replace(/\D/g, '');
+                    // Insertar los dígitos en la posición actual
+                    const start = this.selectionStart || 0;
+                    const end = this.selectionEnd || 0;
+                    const newValue = (this.value.slice(0, start) + digits + this.value.slice(end)).slice(0, this.maxLength || undefined);
+                    this.value = newValue.replace(/\D/g, '');
+                });
+            }
+
+            registerForm.addEventListener('submit', async function(e) {
                 e.preventDefault();
                 
                 const name = document.getElementById('name').value;

@@ -110,3 +110,19 @@ BODY={"id":"11","nombre":"Chocolate 100g","precio":"45.00","imagen":"https:\/\/p
 SQL=UPDATE productos SET nombre = :nombre, imagen = :imagen, precio = :precio, descripcion = :descripcion, categoria = :categoria, descuento_activo = :descuento_activo, precio_descuento = :precio_descuento WHERE id = :id
 BIND={"id":11,"nombre":"Chocolate 100g","imagen":"https:\/\/perfectdailygrind.com\/es\/wp-content\/uploads\/sites\/2\/2020\/04\/Hs_5Ce8ecmXodh-AdEVHyT07irPaZ-zAAhYkKYRJgS5CVzHKs0cAAdyeAF9TIgyh4KI5gqYmyuIDwJnf2f9wCdNvJ5WbQOlSoRr5zmmzMalyR1-RQxvlOtTZkJq9G_GPUiVZ6_WX-1.jpeg","precio":45,"descripcion":"Chocolate con leche de alta calidad.","categoria":"snacks","descuento_activo":1,"precio_descuento":30}
 
+2026-04-20T19:24:05+02:00 | products.update called
+\
+_POST={"id":"6","nombre":"dcvx","precio":"100.00","imagen":"https:\/\/www.noticiasneo.com\/sites\/default\/files\/inline-images\/Despensa.jpg","descripcion":"fgdffg","categoria":"supermercado","descuento_activo":"0","precio_descuento":"30.00"}
+BODY={"id":"6","nombre":"dcvx","precio":"100.00","imagen":"https:\/\/www.noticiasneo.com\/sites\/default\/files\/inline-images\/Despensa.jpg","descripcion":"fgdffg","categoria":"supermercado","descuento_activo":"0","precio_descuento":"30.00"}
+2026-04-20T19:24:05+02:00 | about to execute UPDATE
+SQL=UPDATE productos SET nombre = :nombre, imagen = :imagen, precio = :precio, descripcion = :descripcion, categoria = :categoria, descuento_activo = :descuento_activo, precio_descuento = :precio_descuento WHERE id = :id
+BIND={"id":6,"nombre":"dcvx","imagen":"https:\/\/www.noticiasneo.com\/sites\/default\/files\/inline-images\/Despensa.jpg","precio":100,"descripcion":"fgdffg","categoria":"supermercado","descuento_activo":0,"precio_descuento":30}
+
+2026-04-20T19:27:52+02:00 | products.update called
+\
+_POST={"id":"1","nombre":"Leche Entera 1L","precio":"30.00","imagen":"https:\/\/images.unsplash.com\/photo-1550583724-b2692b85b150?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60","descripcion":"Leche entera pasteurizada de alta calidad, rica en calcio y vitaminas.","categoria":"lacteos","descuento_activo":"1","precio_descuento":"19.00"}
+BODY={"id":"1","nombre":"Leche Entera 1L","precio":"30.00","imagen":"https:\/\/images.unsplash.com\/photo-1550583724-b2692b85b150?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60","descripcion":"Leche entera pasteurizada de alta calidad, rica en calcio y vitaminas.","categoria":"lacteos","descuento_activo":"1","precio_descuento":"19.00"}
+2026-04-20T19:27:52+02:00 | about to execute UPDATE
+SQL=UPDATE productos SET nombre = :nombre, imagen = :imagen, precio = :precio, descripcion = :descripcion, categoria = :categoria, descuento_activo = :descuento_activo, precio_descuento = :precio_descuento WHERE id = :id
+BIND={"id":1,"nombre":"Leche Entera 1L","imagen":"https:\/\/images.unsplash.com\/photo-1550583724-b2692b85b150?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60","precio":30,"descripcion":"Leche entera pasteurizada de alta calidad, rica en calcio y vitaminas.","categoria":"lacteos","descuento_activo":1,"precio_descuento":19}
+
